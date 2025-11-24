@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Airport Weather Dashboard</title>
+    <link
+      rel="stylesheet"
+      href="static/style.css"
+    />
+  </head>
+  <body>
+    <div class="container">
+      <div class="top-bar">
+        <div class="flight-category MVFR">MVFR</div>
+        <div class="header">
+          <div class="airport-code">KSKA</div>
+          <div class="airport-name">Fairchild Air Force Base</div>
+        </div>
+      </div>
+
+      <div class="main-content">
+        <!-- Left Panel -->
+        <div class="left-panel">
+          <div class="current-weather">
+            <div class="weather-icon-display">☁️</div>
+            <div class="current-temp">7°F</div>
+            <div class="condition">CLOUDY</div>
+          </div>
+
+          <div class="wind-display">
+            <div class="wind-label">WIND</div>
+            <div class="wind-content">
+              <div class="wind-arrow">
+                <div class="arrow" style="transform: rotate(20deg)">
+                  ↑
+                </div>
+              </div>
+              <div class="wind-info">
+                <div class="wind-speed">9 KTS</div>
+                <div class="wind-direction">200</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Center Panel -->
+        <div class="center-panel">
+          <div class="details-grid">
+            <div class="detail-card">
+              <div class="detail-label">VISIBILITY</div>
+              <div class="detail-value">
+                10<span class="detail-unit"> SM</span>
+              </div>
+            </div>
+
+            <div class="detail-card">
+              <div class="detail-label">CEILING</div>
+              <div class="detail-value">
+                OVC010<span class="detail-unit"> ft</span>
+              </div>
+            </div>
+
+            <div class="detail-card">
+              <div class="detail-label">PRESSURE</div>
+              <div class="detail-value">
+                29.93<span class="detail-unit"> inHg</span>
+              </div>
+            </div>
+
+            <div class="detail-card">
+              <div class="detail-label">PA/DA</div>
+              <div class="detail-value">
+                2451' / 2034'<span class="detail-unit"></span>
+              </div>
+            </div>
+
+            <div class="detail-card">
+              <div class="detail-label">DEW POINT</div>
+              <div class="detail-value">6°F</div>
+            </div>
+
+            <div class="detail-card">
+              <div class="detail-label">Wx Observations</div>
+              
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Panel -->
+        <div class="right-panel">
+          <div class="taf-title">TAF - Terminal Aerodrome Forecast</div>
+          <div class="taf-box">
+            
+            <p class="taf-text">2403/2509 20006KT 9999 VCSH SCT015 OVC040 610606 QNH2998INS</p>
+            
+            <p class="taf-text">BECMG 2404/2406 20009KT 8000 -SHRA OVC010 610609 QNH2996INS</p>
+            
+            <p class="taf-text">BECMG 2407/2408 22010G15KT 6000 -RA BR OVC005 620604 QNH2993INS</p>
+            
+            <p class="taf-text">BECMG 2410/2411 24012G22KT 9999 NSW BKN020 BKN060 620609 QNH2993INS</p>
+            
+            <p class="taf-text">BECMG 2500/2501 24009KT 9999 SCT100 QNH3026INS TX07/2403Z TN01/2415Z</p>
+            
+          </div>
+        </div>
+      </div>
+      <div class="footer">UPDATED AT: 2025-11-24 06:55:00 UTC</div>
+    </div>
+  </body>
+</html>
