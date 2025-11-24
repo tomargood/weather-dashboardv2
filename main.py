@@ -15,12 +15,19 @@ from rich import print_json
 import sys
 
 # Import Waveshare library
+EPAPER_AVAILABLE = False
+EPD = None
+
 try:
     from waveshare_epd.epd7in3f import EPD
     EPAPER_AVAILABLE = True
-except ImportError:
-    print("⚠ Warning: waveshare_epd library not found. Running in preview mode only.")
-    EPAPER_AVAILABLE = False
+    print("✓ Waveshare e-paper library loaded")
+except ImportError as e:
+    print(f"⚠ Warning: Could not import waveshare_epd: {e}")
+    print("Running in preview mode only (no e-paper display)")
+except Exception as e:
+    print(f"⚠ Warning: Error loading e-paper library: {e}")
+    print("This might be a GPIO permissions issue. Try running with sudo for testing.")
 
 # Configuration
 API_KEY_PATH = Path("API_keys/avwxkeys.txt")
