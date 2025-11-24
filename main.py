@@ -146,6 +146,37 @@ def render_html(template_path, weather_data, output_path):
     template = env.get_template(template_path.name)
     html_output = template.render(**weather_data)
     
+    # Force exact dimensions with inline styles
+    dimension_fix = """
+    <style>
+        html, body {
+            width: 800px !important;
+            height: 480px !important;
+            min-height: 480px !important;
+            max-height: 480px !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            overflow: hidden !important;
+        }
+        .container {
+            width: 800px !important;
+            height: 480px !important;
+            min-height: 480px !important;
+            max-height: 480px !important;
+            box-sizing: border-box !important;
+            border: 5px solid red !important;
+        }
+    </style>
+    """
+    
+    # Insert before </head> or </body>
+    if '</head>' in html_output:
+        html_output = html_output.replace('</head>', dimension_fix + '</head>')
+    elif '<body>' in html_output:
+        html_output = html_output.replace('<body>', '<body>' + dimension_fix)
+    else:
+        html_output = dimension_fix + html_output
+    
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with open(output_path, 'w') as f:
         f.write(html_output)
