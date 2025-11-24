@@ -114,16 +114,19 @@ def screenshot():
     
     for chromium_cmd in chromium_commands:
         try:
-            subprocess.run([
+            print(f"  Trying {chromium_cmd}...")
+            result = subprocess.run([
                 chromium_cmd,
                 '--headless',
                 '--disable-gpu',
                 '--no-sandbox',
+                '--disable-dev-shm-usage',  # Helps on low memory systems
+                '--disable-software-rasterizer',
                 '--window-size=800,480',
                 '--force-device-scale-factor=1',
                 f'--screenshot={PNG_OUT.absolute()}',
                 f'file://{HTML_OUT.absolute()}'
-            ], check=True, capture_output=True, timeout=30)
+            ], capture_output=True, timeout=60)  # Increased timeout to 60 seconds
             
             # Verify the screenshot
             if PNG_OUT.exists():
@@ -137,11 +140,22 @@ def screenshot():
                     print(f"  Resized to: 800x480")
                 
                 return True
+            else:
+                print(f"  ✗ PNG not created")
                 
-        except (FileNotFoundError, subprocess.CalledProcessError):
+        except subprocess.TimeoutExpired:
+            print(f"  ✗ Timeout with {chromium_cmd} (60 seconds)")
+            continue
+        except FileNotFoundError:
+            print(f"  ✗ Not found: {chromium_cmd}")
+            continue
+        except subprocess.CalledProcessError as e:
+            print(f"  ✗ Error: {e}")
             continue
     
-    print("❌ Chromium not found. Install with: sudo apt install chromium-browser")
+    print("❌ All chromium commands failed")
+    print("   Chromium may be having issues on this system")
+    print("   Check: chromium-browser --version")
     return False
 
 def display():
