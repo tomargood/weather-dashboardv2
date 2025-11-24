@@ -107,14 +107,39 @@ def get_weather_data(airport, token):
         "wxcode": wxcode, "pa": pa, "da": da, "obs": maincode,
     }
 
+def copy_static_files():
+    """Copy static files to output directory"""
+    import shutil
+    static_src = Path("static")
+    static_dst = Path("output/static")
+    
+    if static_src.exists():
+        shutil.copytree(static_src, static_dst, dirs_exist_ok=True)
+        print(f"✓ Copied static files")
+    else:
+        print("⚠ No static folder found")
+
 def render_html(template_path, weather_data, output_path):
     """Render template to HTML"""
-    with open(template_path, 'r') as f:
-        template = Template(f.read())
+    from jinja2 import Environment, FileSystemLoader
     
+    # Set up Jinja2 environment with template directory
+    env = Environment(loader=FileSystemLoader(template_path.parent))
+    
+    # Add url_for function that returns static paths
+    def url_for(endpoint, filename=None, **values):
+        if endpoint == 'static' and filename:
+            return f'static/{filename}'
+        return '#'
+    
+    # Add url_for to globals
+    env.globals['url_for'] = url_for
+    
+    # Load and render template
+    template = env.get_template(template_path.name)
     html_output = template.render(**weather_data)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
     
+    output_path.parent.mkdir(parents=True, exist_ok=True)
     with open(output_path, 'w') as f:
         f.write(html_output)
     
@@ -178,6 +203,9 @@ def update_cycle():
         weather_data = get_weather_data(AIRPORT, token)
         if not weather_data:
             return False
+        
+        # Copy static files (CSS, JS, images)
+        copy_static_files()
         
         render_html(TEMPLATE_PATH, weather_data, HTML_OUTPUT)
         
