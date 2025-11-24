@@ -27,15 +27,15 @@ body * {
   height: 480px;
   display: flex;
   flex-direction: column;
-  padding: 10px;
+  padding: 6px;
   box-sizing: border-box;
 }
 
 /* Top Bar */
 .top-bar {
   display: flex;
-  gap: 10px;
-  margin-bottom: 10px;
+  gap: 6px;
+  margin-bottom: 6px;
   flex-shrink: 0;
 }
 
@@ -95,9 +95,9 @@ body * {
 /* Main Content Area */
 .main-content {
   display: flex;
-  gap: 10px;
+  gap: 6px;
   flex: 1;
-  margin-bottom: 10px;
+  margin-bottom: 6px;
   min-height: 0;
   overflow: hidden;
 }
@@ -107,7 +107,7 @@ body * {
   flex: 0 0 35%;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
 }
 
 .current-weather {
@@ -430,10 +430,11 @@ body * {
 
 /* Footer */
 .footer {
-  padding: 4px 0;
+  padding: 2px 0;
   text-align: center;
-  font-size: 11px;
+  font-size: 10px;
   border-top: 2px solid black;
   flex-shrink: 0;
   margin: 0;
+  line-height: 1;
 }
