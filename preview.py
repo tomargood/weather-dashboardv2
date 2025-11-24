@@ -176,7 +176,6 @@ def create_preview_png():
                 '--headless',
                 '--disable-gpu',
                 '--no-sandbox',
-                f'--window-size={width},{height}',
                 '--force-device-scale-factor=1',
                 '--hide-scrollbars',
                 f'--screenshot={PNG_OUTPUT.absolute()}',

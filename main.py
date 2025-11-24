@@ -112,7 +112,7 @@ def screenshot():
             '--headless',
             '--disable-gpu',
             '--no-sandbox',
-            '--hide-scrollbars'
+            '--hide-scrollbars',
             '--disable-dev-shm-usage',
             '--disable-software-rasterizer',
             '--force-device-scale-factor=1',
