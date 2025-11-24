@@ -146,6 +146,30 @@ def render_html(template_path, weather_data, output_path):
     template = env.get_template(template_path.name)
     html_output = template.render(**weather_data)
     
+    # Add CSS to remove scrollbars and ensure content fits
+    scrollbar_fix = """
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            overflow: hidden !important;
+            width: 800px;
+            height: 480px;
+        }
+        * {
+            overflow: hidden !important;
+        }
+    </style>
+    """
+    
+    # Insert the fix before </head> or </body> or at the end
+    if '</head>' in html_output:
+        html_output = html_output.replace('</head>', scrollbar_fix + '</head>')
+    elif '</body>' in html_output:
+        html_output = html_output.replace('</body>', scrollbar_fix + '</body>')
+    else:
+        html_output += scrollbar_fix
+    
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with open(output_path, 'w') as f:
         f.write(html_output)
@@ -231,15 +255,38 @@ def update_cycle():
         print(f"❌ Error: {e}")
         return False
 
+def cleanup_display():
+    """Clear and sleep the e-paper display on exit"""
+    if not EPAPER_AVAILABLE:
+        return
+    
+    try:
+        print("\nClearing e-paper display...")
+        epd = EPD()
+        epd.init()
+        epd.Clear()
+        epd.sleep()
+        print("✓ Display cleared and sleeping")
+    except Exception as e:
+        print(f"⚠ Could not clear display: {e}")
+
 def main():
     """Main loop"""
     print(f"Weather Dashboard - {AIRPORT}")
     print(f"Update every {UPDATE_INTERVAL//60} minutes")
     
-    while True:
-        update_cycle()
-        print(f"\nNext update: {(datetime.now().timestamp() + UPDATE_INTERVAL)}")
-        time.sleep(UPDATE_INTERVAL)
+    try:
+        while True:
+            update_cycle()
+            print(f"\nNext update in {UPDATE_INTERVAL} seconds...")
+            time.sleep(UPDATE_INTERVAL)
+    except KeyboardInterrupt:
+        print("\n\nStopped by user")
+        cleanup_display()
+    except Exception as e:
+        print(f"\n❌ Fatal error: {e}")
+        cleanup_display()
+        raise
 
 if __name__ == "__main__":
     try:
@@ -248,5 +295,9 @@ if __name__ == "__main__":
         response = input("\nRun continuous updates? (y/n): ")
         if response.lower() == 'y':
             main()
+        else:
+            print("Single update complete.")
+            cleanup_display()
     except KeyboardInterrupt:
         print("\n\nStopped by user")
+        cleanup_display()
