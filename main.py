@@ -9,10 +9,8 @@ from jinja2 import Environment, FileSystemLoader
 import requests
 from datetime import datetime
 import time
+import subprocess
 from PIL import Image
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
 
 # Configuration
 API_KEY = Path("API_keys/avwxkeys.txt").read_text().strip()
@@ -106,20 +104,45 @@ def render_html(data):
         shutil.copytree(static_src, static_dst, dirs_exist_ok=True)
 
 def screenshot():
-    """Take screenshot with Selenium"""
-    options = Options()
-    options.add_argument('--headless')
-    options.add_argument('--disable-gpu')
-    options.add_argument('--no-sandbox')
+    """Take screenshot with Chromium"""
+    # Try different chromium commands
+    chromium_commands = [
+        'chromium-browser',  # Raspberry Pi
+        'chromium',          # Some Linux
+        '/usr/bin/chromium-browser',  # Explicit path
+    ]
     
-    driver = webdriver.Chrome(options=options)
-    driver.set_window_size(820, 800)
-    driver.get(f'file://{HTML_OUT.absolute()}')
-    time.sleep(1)
+    for chromium_cmd in chromium_commands:
+        try:
+            subprocess.run([
+                chromium_cmd,
+                '--headless',
+                '--disable-gpu',
+                '--no-sandbox',
+                '--window-size=800,480',
+                '--force-device-scale-factor=1',
+                f'--screenshot={PNG_OUT.absolute()}',
+                f'file://{HTML_OUT.absolute()}'
+            ], check=True, capture_output=True, timeout=30)
+            
+            # Verify the screenshot
+            if PNG_OUT.exists():
+                img = Image.open(PNG_OUT)
+                print(f"  Screenshot: {img.size[0]}x{img.size[1]}")
+                
+                # Resize to exact 800x480 if needed
+                if img.size != (800, 480):
+                    img = img.resize((800, 480), Image.Resampling.LANCZOS)
+                    img.save(PNG_OUT)
+                    print(f"  Resized to: 800x480")
+                
+                return True
+                
+        except (FileNotFoundError, subprocess.CalledProcessError):
+            continue
     
-    body = driver.find_element(By.TAG_NAME, 'body')
-    body.screenshot(str(PNG_OUT))
-    driver.quit()
+    print("❌ Chromium not found. Install with: sudo apt install chromium-browser")
+    return False
 
 def display():
     """Show on e-paper display"""
@@ -147,7 +170,8 @@ def update():
         render_html(data)
         
         print("Taking screenshot...")
-        screenshot()
+        if not screenshot():
+            return
         
         print("Displaying on e-paper...")
         display()
