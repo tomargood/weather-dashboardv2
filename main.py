@@ -114,7 +114,7 @@ def screenshot():
             '--no-sandbox',
             '--disable-dev-shm-usage',
             '--disable-software-rasterizer',
-            '--window-size=815,600',
+            '--window-size=810,550',
             '--force-device-scale-factor=1',
             f'--screenshot={PNG_OUT.absolute()}',
             f'file://{HTML_OUT.absolute()}'
@@ -126,8 +126,8 @@ def screenshot():
             print(f"  Screenshot: {img.size[0]}x{img.size[1]}")
             
             # Resize to exact 800x480 if needed
-            if img.size != (800, 480):
-                img = img.resize((800, 480), Image.Resampling.LANCZOS)
+            if img.size != (800, 550):
+                img = img.resize((800, 550), Image.Resampling.LANCZOS)
                 img.save(PNG_OUT)
                 print(f"  Resized to: 800x480")
             
