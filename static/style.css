@@ -1,0 +1,405 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: "Arial", "Helvetica", sans-serif;
+  background: white;
+  color: black;
+  padding: 10px;
+  line-height: 1.3;
+}
+
+.container {
+  max-width: 100%;
+  height: calc(100vh - 20px);
+  display: flex;
+  flex-direction: column;
+}
+
+/* Top Bar */
+.top-bar {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.flight-category {
+  flex: 0 0 140px;
+  text-align: center;
+  padding: 12px;
+  border: 3px solid black;
+  font-weight: bold;
+  font-size: 28px;
+  letter-spacing: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.flight-category.IFR {
+  background: #ff0000;
+  color: white;
+}
+
+.flight-category.LIFR {
+  background: #ff00ff;
+  color: white;
+}
+
+.flight-category.MVFR {
+  background: #0000ff;
+  color: white;
+}
+
+.flight-category.VFR {
+  background: #00ff00;
+  color: black;
+}
+
+.header {
+  flex: 1;
+  border: 3px solid black;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+}
+
+.airport-code {
+  font-size: 36px;
+  font-weight: bold;
+  letter-spacing: 0px;
+}
+
+.airport-name {
+  font-size: 16px;
+}
+
+/* Main Content Area */
+.main-content {
+  display: flex;
+  gap: 10px;
+  flex: 1;
+  margin-bottom: 10px;
+}
+
+/* Left Panel - Current Weather */
+.left-panel {
+  flex: 0 0 35%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.current-weather {
+  border: 3px solid black;
+  padding: 20px;
+  text-align: center;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background: linear-gradient(135deg, #f0f0f0 0%, #ffffff 100%);
+  position: relative;
+}
+
+.weather-icon-display {
+  font-size: 48px;
+  margin-bottom: 8px;
+}
+
+.current-temp {
+  font-size: 72px;
+  font-weight: bold;
+  line-height: 1;
+  background: linear-gradient(180deg, #2d2d2d 0%, #000000 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.condition {
+  font-size: 20px;
+  font-weight: bold;
+  margin-top: 8px;
+  padding: 6px 16px;
+  background: black;
+  color: white;
+  border-radius: 20px;
+  display: inline-block;
+}
+
+.wind-display {
+  border: 3px solid black;
+  padding: 16px;
+  text-align: center;
+}
+
+.wind-label {
+  font-size: 14px;
+  font-weight: bold;
+  margin-bottom: 8px;
+}
+
+.wind-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+
+.wind-arrow {
+  width: 60px;
+  height: 60px;
+}
+
+.arrow {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 50px;
+}
+
+.wind-info {
+  text-align: left;
+}
+
+.wind-speed {
+  font-size: 28px;
+  font-weight: bold;
+}
+
+.wind-direction {
+  font-size: 16px;
+  margin-top: 2px;
+}
+
+/* Center Panel - Details */
+.center-panel {
+  flex: 0 0 30%;
+  border: 3px solid black;
+}
+
+.details-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: repeat(6, 1fr);
+  height: 100%;
+}
+
+.detail-card {
+  border-bottom: 2px solid black;
+  padding: 10px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.detail-card:last-child {
+  border-bottom: none;
+}
+
+.detail-label {
+  font-size: 13px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.detail-value {
+  font-size: 24px;
+  font-weight: bold;
+}
+
+.detail-unit {
+  font-size: 14px;
+  font-weight: normal;
+}
+
+/* Right Panel - Forecast Chart */
+.right-panel {
+  flex: 1;
+  border: 3px solid black;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+}
+
+.forecast-title {
+  font-size: 16px;
+  font-weight: bold;
+  text-align: center;
+  margin-bottom: 10px;
+  text-transform: uppercase;
+}
+
+.chart-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.chart-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  justify-content: space-around;
+}
+
+.chart-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  position: relative;
+}
+
+.chart-label {
+  font-size: 16px;
+  font-weight: bold;
+  width: 50px;
+  text-align: right;
+}
+
+.precip-info {
+  width: 70px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.precip-indicator {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.precip-chance {
+  font-size: 13px;
+  font-weight: bold;
+  color: #000;
+}
+
+.temp-bars-container {
+  flex: 1;
+  position: relative;
+  height: 60px;
+  display: flex;
+  align-items: center;
+}
+
+.temp-bar-wrapper {
+  position: absolute;
+  height: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.temp-high {
+  background: #ff6b6b;
+  height: 40px;
+  border: 3px solid black;
+  border-radius: 0 6px 6px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+  font-size: 18px;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+.temp-low {
+  background: #6bb6ff;
+  height: 40px;
+  border: 3px solid black;
+  border-radius: 6px 0 0 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+  font-size: 18px;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+.dewpoint-marker {
+  position: absolute;
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-top: 12px solid #ffd93d;
+  top: -2px;
+  transform: translateX(-50%);
+  filter: drop-shadow(0 0 2px black);
+}
+
+.dewpoint-marker::after {
+  content: "";
+  position: absolute;
+  width: 3px;
+  height: 8px;
+  background: #ffd93d;
+  left: 50%;
+  top: 0;
+  transform: translateX(-50%);
+  border-left: 1px solid black;
+  border-right: 1px solid black;
+}
+
+.temp-scale {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: #ccc;
+}
+
+.chart-legend {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  font-size: 10px;
+  margin-top: 8px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend-box {
+  width: 14px;
+  height: 14px;
+  border: 2px solid black;
+}
+
+.taf-box {
+  font-family: "Courier New", monospace;
+  line-height: 1; /* tight line spacing */
+  white-space: pre-wrap; /* preserve newlines + wrap long text */
+  word-break: break-word; /* wrap long blocks */
+  margin: 0; /* no extra box spacing */
+  padding: 0; /* no padding */
+  color: #2a2c2e;
+  font-size: 0.95rem;
+}
+
+/* Footer */
+.footer {
+  padding: 8px 0;
+  text-align: center;
+  font-size: 11px;
+  border-top: 2px solid black;
+}
