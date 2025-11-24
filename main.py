@@ -112,6 +112,7 @@ def screenshot():
             '--headless',
             '--disable-gpu',
             '--no-sandbox',
+            '--kiosk',
             '--hide-scrollbars',
             '--disable-dev-shm-usage',
             '--disable-software-rasterizer',
