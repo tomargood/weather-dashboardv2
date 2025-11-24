@@ -126,7 +126,7 @@ def screenshot():
             print(f"  Screenshot: {img.size[0]}x{img.size[1]}")
             
             # Resize to exact 800x480 if needed
-            if img.size != (800, 480):
+            if img.size != (812, 620 ):
                 img = img.resize((800, 480), Image.Resampling.LANCZOS)
                 img.save(PNG_OUT)
                 print(f"  Resized to: 800x480")
