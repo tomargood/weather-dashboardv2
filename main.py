@@ -122,7 +122,7 @@ def screenshot():
                 '--no-sandbox',
                 '--disable-dev-shm-usage',  # Helps on low memory systems
                 '--disable-software-rasterizer',
-                '--window-size=800,480',
+                '--window-size=820,800',
                 '--force-device-scale-factor=1',
                 f'--screenshot={PNG_OUT.absolute()}',
                 f'file://{HTML_OUT.absolute()}'
