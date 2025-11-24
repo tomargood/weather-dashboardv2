@@ -108,7 +108,7 @@ def screenshot():
     try:
         print(f"  Using chromium-browser...")
         subprocess.run([
-            'chromium-browser',
+            'chromium',
             '--headless',
             '--disable-gpu',
             '--no-sandbox',
