@@ -5,11 +5,10 @@ Fetches weather, renders HTML, generates PNG, and displays on e-paper
 """
 
 from pathlib import Path
-from jinja2 import Template
+from jinja2 import Environment, FileSystemLoader
 import requests
 from datetime import datetime
 import time
-import subprocess
 from PIL import Image
 from rich import print_json
 import sys
