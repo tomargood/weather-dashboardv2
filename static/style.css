@@ -13,9 +13,9 @@ html {
   width: 780px;
   min-width: 780px;
   max-width: 780px;
-  height: 490px;
-  min-height: 490px;
-  max-height: 490px;
+  height: 500px;
+  min-height: 500px;
+  max-height: 500px;
   margin: 0;
   padding: 0;
   overflow: hidden;
@@ -25,9 +25,9 @@ html {
   width: 780px;
   min-width: 780px;
   max-width: 780px;
-  height: 490px;
-  min-height: 490px;
-  max-height: 490px;
+  height: 500px;
+  min-height: 500px;
+  max-height: 500px;
   display: flex;
   flex-direction: column;
   padding: 6px;
