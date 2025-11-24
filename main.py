@@ -115,7 +115,7 @@ def screenshot():
             '--disable-dev-shm-usage',
             '--disable-software-rasterizer',
             '--window-size=812,620',
-            '--force-device-scale-factor=1',
+            '--force-device-scale-factor=1.5',
             f'--screenshot={PNG_OUT.absolute()}',
             f'file://{HTML_OUT.absolute()}'
         ], capture_output=True, timeout=60, check=True)
