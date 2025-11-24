@@ -13,15 +13,21 @@ html {
   width: 750px;
   min-width: 750px;
   max-width: 750px;
+  height: 490px;
+  min-height: 490px;
+  max-height: 490px;
   margin: 0;
   padding: 0;
-  overflow-x: hidden;
+  overflow: hidden;
 }
 
 .container {
   width: 750px;
   min-width: 750px;
   max-width: 750px;
+  height: 490px;
+  min-height: 490px;
+  max-height: 490px;
   display: flex;
   flex-direction: column;
   padding: 6px;
