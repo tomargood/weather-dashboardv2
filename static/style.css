@@ -16,6 +16,9 @@ html {
   width: 800px;
   height: 480px;
   margin: 0;
+  /* Debug: ensure full height */
+  min-height: 480px;
+  max-height: 480px;
 }
 
 body * {
@@ -23,12 +26,16 @@ body * {
 }
 
 .container {
-  max-width: 100%;
+  width: 800px;
   height: 480px;
+  min-height: 480px;
+  max-height: 480px;
   display: flex;
   flex-direction: column;
   padding: 6px;
   box-sizing: border-box;
+  /* Temporary debug border - remove after testing */
+  border: 3px solid red;
 }
 
 /* Top Bar */
