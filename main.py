@@ -105,58 +105,48 @@ def render_html(data):
 
 def screenshot():
     """Take screenshot with Chromium"""
-    # Try different chromium commands
-    chromium_commands = [
-        'chromium-browser',  # Raspberry Pi
-        'chromium',          # Some Linux
-        '/usr/bin/chromium-browser',  # Explicit path
-    ]
-    
-    for chromium_cmd in chromium_commands:
-        try:
-            print(f"  Trying {chromium_cmd}...")
-            result = subprocess.run([
-                chromium_cmd,
-                '--headless',
-                '--disable-gpu',
-                '--no-sandbox',
-                '--disable-dev-shm-usage',  # Helps on low memory systems
-                '--disable-software-rasterizer',
-                '--window-size=820,800',
-                '--force-device-scale-factor=1',
-                f'--screenshot={PNG_OUT.absolute()}',
-                f'file://{HTML_OUT.absolute()}'
-            ], capture_output=True, timeout=60)  # Increased timeout to 60 seconds
+    try:
+        print(f"  Using chromium-browser...")
+        subprocess.run([
+            'chromium-browser',
+            '--headless',
+            '--disable-gpu',
+            '--no-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-software-rasterizer',
+            '--window-size=810,500',
+            '--force-device-scale-factor=1',
+            f'--screenshot={PNG_OUT.absolute()}',
+            f'file://{HTML_OUT.absolute()}'
+        ], capture_output=True, timeout=60, check=True)
+        
+        # Verify the screenshot
+        if PNG_OUT.exists():
+            img = Image.open(PNG_OUT)
+            print(f"  Screenshot: {img.size[0]}x{img.size[1]}")
             
-            # Verify the screenshot
-            if PNG_OUT.exists():
-                img = Image.open(PNG_OUT)
-                print(f"  Screenshot: {img.size[0]}x{img.size[1]}")
-                
-                # Resize to exact 800x480 if needed
-                if img.size != (800, 480):
-                    img = img.resize((800, 480), Image.Resampling.LANCZOS)
-                    img.save(PNG_OUT)
-                    print(f"  Resized to: 800x480")
-                
-                return True
-            else:
-                print(f"  ✗ PNG not created")
-                
-        except subprocess.TimeoutExpired:
-            print(f"  ✗ Timeout with {chromium_cmd} (60 seconds)")
-            continue
-        except FileNotFoundError:
-            print(f"  ✗ Not found: {chromium_cmd}")
-            continue
-        except subprocess.CalledProcessError as e:
-            print(f"  ✗ Error: {e}")
-            continue
-    
-    print("❌ All chromium commands failed")
-    print("   Chromium may be having issues on this system")
-    print("   Check: chromium-browser --version")
-    return False
+            # Resize to exact 800x480 if needed
+            if img.size != (800, 480):
+                img = img.resize((800, 480), Image.Resampling.LANCZOS)
+                img.save(PNG_OUT)
+                print(f"  Resized to: 800x480")
+            
+            return True
+        else:
+            print(f"  ✗ PNG not created")
+            return False
+            
+    except subprocess.TimeoutExpired:
+        print(f"  ✗ Timeout after 60 seconds")
+        print(f"  Chromium is taking too long - may need more memory/CPU")
+        return False
+    except FileNotFoundError:
+        print(f"  ✗ chromium-browser not found")
+        print(f"  Install with: sudo apt install chromium-browser")
+        return False
+    except subprocess.CalledProcessError as e:
+        print(f"  ✗ Chromium error: {e}")
+        return False
 
 def display():
     """Show on e-paper display"""
