@@ -146,30 +146,6 @@ def render_html(template_path, weather_data, output_path):
     template = env.get_template(template_path.name)
     html_output = template.render(**weather_data)
     
-    # Add CSS to remove scrollbars and ensure content fits
-    scrollbar_fix = """
-    <style>
-        body, html {
-            margin: 0;
-            padding: 0;
-            overflow: hidden !important;
-            width: 800px;
-            height: 480px;
-        }
-        * {
-            overflow: hidden !important;
-        }
-    </style>
-    """
-    
-    # Insert the fix before </head> or </body> or at the end
-    if '</head>' in html_output:
-        html_output = html_output.replace('</head>', scrollbar_fix + '</head>')
-    elif '</body>' in html_output:
-        html_output = html_output.replace('</body>', scrollbar_fix + '</body>')
-    else:
-        html_output += scrollbar_fix
-    
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with open(output_path, 'w') as f:
         f.write(html_output)
