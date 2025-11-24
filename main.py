@@ -158,13 +158,31 @@ def html_to_png(html_path, png_path):
     
     # Try different screenshot tools
     commands = [
-        ['wkhtmltoimage', '--width', str(DISPLAY_WIDTH), '--height', str(DISPLAY_HEIGHT),
-         '--quality', '100', str(html_path), str(png_path)],
-        ['chromium', '--headless', '--disable-gpu',
-         f'--screenshot={png_path}', f'--window-size={DISPLAY_WIDTH},{DISPLAY_HEIGHT}',
+        ['wkhtmltoimage', 
+         '--width', str(DISPLAY_WIDTH), 
+         '--height', str(DISPLAY_HEIGHT),
+         '--quality', '100',
+         '--enable-local-file-access',
+         '--disable-smart-width',
+         str(html_path), 
+         str(png_path)],
+        ['chromium', 
+         '--headless', 
+         '--disable-gpu',
+         '--force-device-scale-factor=1',
+         '--hide-scrollbars',
+         f'--screenshot={png_path}', 
+         f'--window-size={DISPLAY_WIDTH},{DISPLAY_HEIGHT}',
+         f'--default-background-color=0',
          f'file://{html_path.absolute()}'],
-        ['chromium-browser', '--headless', '--disable-gpu',
-         f'--screenshot={png_path}', f'--window-size={DISPLAY_WIDTH},{DISPLAY_HEIGHT}',
+        ['chromium-browser', 
+         '--headless', 
+         '--disable-gpu',
+         '--force-device-scale-factor=1',
+         '--hide-scrollbars',
+         f'--screenshot={png_path}', 
+         f'--window-size={DISPLAY_WIDTH},{DISPLAY_HEIGHT}',
+         f'--default-background-color=0',
          f'file://{html_path.absolute()}'],
     ]
     
@@ -172,6 +190,18 @@ def html_to_png(html_path, png_path):
         try:
             subprocess.run(cmd, check=True, capture_output=True)
             print(f"✓ PNG: {png_path}")
+            
+            # Verify the image dimensions
+            from PIL import Image
+            img = Image.open(png_path)
+            print(f"  Image size: {img.size[0]}x{img.size[1]}")
+            
+            # If image is not the right size, resize it
+            if img.size != (DISPLAY_WIDTH, DISPLAY_HEIGHT):
+                print(f"  Resizing to {DISPLAY_WIDTH}x{DISPLAY_HEIGHT}")
+                img = img.resize((DISPLAY_WIDTH, DISPLAY_HEIGHT), Image.Resampling.LANCZOS)
+                img.save(png_path)
+            
             return True
         except (subprocess.CalledProcessError, FileNotFoundError):
             continue
