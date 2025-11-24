@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Complete Weather Dashboard for Waveshare E-Paper Display
-Fetches weather, renders HTML, generates PNG, and displays on e-paper
+Weather Dashboard for E-Paper Display
+Fetch weather → Render HTML → Screenshot → Display on e-ink
 """
 
 from pathlib import Path
@@ -10,326 +10,160 @@ import requests
 from datetime import datetime
 import time
 from PIL import Image
-from rich import print_json
-import sys
-
-# Import Waveshare library
-EPAPER_AVAILABLE = False
-EPD = None
-
-try:
-    from waveshare_epd.epd7in3f import EPD
-    EPAPER_AVAILABLE = True
-    print("✓ Waveshare e-paper library loaded")
-except ImportError as e:
-    print(f"⚠ Warning: Could not import waveshare_epd: {e}")
-    print("Running in preview mode only (no e-paper display)")
-except Exception as e:
-    print(f"⚠ Warning: Error loading e-paper library: {e}")
-    print("This might be a GPIO permissions issue. Try running with sudo for testing.")
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
 
 # Configuration
-API_KEY_PATH = Path("API_keys/avwxkeys.txt")
-AIRPORT = "KSKA"  # Change to your airport
-HTML_OUTPUT = Path("output/weather.html")
-PNG_OUTPUT = Path("output/weather.png")
-TEMPLATE_PATH = Path("templates/page.html")
+API_KEY = Path("API_keys/avwxkeys.txt").read_text().strip()
+AIRPORT = "KSKA"
+TEMPLATE = Path("templates/page.html")
+HTML_OUT = Path("output/weather.html")
+PNG_OUT = Path("output/weather.png")
 UPDATE_INTERVAL = 300  # 5 minutes
 
-# Display dimensions
-DISPLAY_WIDTH = 800
-DISPLAY_HEIGHT = 480
+# Try to import e-paper display
+try:
+    from waveshare_epd.epd7in3f import EPD
+    HAS_DISPLAY = True
+except:
+    HAS_DISPLAY = False
+    print("⚠ No e-paper display available")
 
-def get_weather_data(airport, token):
-    """Fetch weather data"""
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Accept": "application/json"
-    }
+def fetch_weather():
+    """Get weather data from AVWX API"""
+    headers = {"Authorization": f"Bearer {API_KEY}"}
     
-    url_metar = f"https://avwx.rest/api/metar/{airport}?remove=true"
-    url_station = f"https://avwx.rest/api/station/{airport}"
-    url_taf = f"https://avwx.rest/api/taf/{airport}"
+    # Get METAR
+    metar = requests.get(f"https://avwx.rest/api/metar/{AIRPORT}?remove=true", 
+                         headers=headers, timeout=10).json()
     
+    # Get Station
     try:
-        response = requests.get(url_metar, headers=headers, timeout=10)
-        response.raise_for_status()
-        data = response.json()
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching METAR: {e}")
-        return None
-    
-    try:
-        response1 = requests.get(url_station, headers=headers, timeout=10)
-        response1.raise_for_status()
-        data1 = response1.json()
-        arpt_name = data1["name"]
+        station = requests.get(f"https://avwx.rest/api/station/{AIRPORT}", 
+                              headers=headers, timeout=10).json()
+        arpt_name = station["name"]
     except:
-        arpt_name = airport
+        arpt_name = AIRPORT
     
+    # Get TAF
     try:
-        response2 = requests.get(url_taf, headers=headers, timeout=10)
-        response2.raise_for_status()
-        data2 = response2.json()
-        tafraw = [line["sanitized"] for line in data2["forecast"]]
+        taf = requests.get(f"https://avwx.rest/api/taf/{AIRPORT}", 
+                          headers=headers, timeout=10).json()
+        tafraw = [line["sanitized"] for line in taf["forecast"]]
     except:
         tafraw = ["TAF not available"]
     
-    # Extract all weather data
-    arpt = data["station"]
-    flight_rules = data["flight_rules"]
-    vis = data["visibility"]["repr"]
-    cig = data["clouds"]
-    px = data["altimeter"]["value"]
-    temp = data["temperature"]["value"]
-    dewpt = data["dewpoint"]["value"]
-    wind = data["wind_speed"]["value"]
-    gust = data["wind_gust"]
-    winddir = data["wind_direction"]["value"]
-    pa = data["pressure_altitude"]
-    da = data["density_altitude"]
-    
-    cloudlayers = [layer["repr"] for layer in cig]
-    
+    # Extract weather data
+    winddir = metar["wind_direction"]["value"]
     aarowdir = str((winddir + 180) % 360) + "deg"
     
-    wxcodes = data["wx_codes"]
-    wxcode = [code["repr"] for code in wxcodes]
+    wxcodes = metar["wx_codes"]
     maincode = wxcodes[0]["value"] if wxcodes else None
-    
     if not maincode:
-        has_low_clouds = any(layer.get("altitude", 999) < 100 for layer in cig)
+        has_low_clouds = any(layer.get("altitude", 999) < 100 for layer in metar["clouds"])
         maincode = "CLOUDY" if has_low_clouds else "SKY CLEAR"
     
-    ts = data["time"]["dt"]
-    dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
-    updatetime = dt.strftime("%Y-%m-%d %H:%M:%S %Z")
+    dt = datetime.fromisoformat(metar["time"]["dt"].replace("Z", "+00:00"))
     
     return {
-        "tafraw": tafraw, "time": updatetime, "aarowdir": aarowdir,
-        "rules": flight_rules, "arpt": arpt, "ArptName": arpt_name,
-        "vis": vis, "cig": cloudlayers, "px": px, "temp": temp,
-        "dewpt": dewpt, "wind": wind, "gust": gust, "winddir": winddir,
-        "wxcode": wxcode, "pa": pa, "da": da, "obs": maincode,
+        "arpt": metar["station"],
+        "ArptName": arpt_name,
+        "rules": metar["flight_rules"],
+        "vis": metar["visibility"]["repr"],
+        "cig": [layer["repr"] for layer in metar["clouds"]],
+        "px": metar["altimeter"]["value"],
+        "temp": metar["temperature"]["value"],
+        "dewpt": metar["dewpoint"]["value"],
+        "wind": metar["wind_speed"]["value"],
+        "gust": metar["wind_gust"],
+        "winddir": winddir,
+        "aarowdir": aarowdir,
+        "wxcode": [code["repr"] for code in wxcodes],
+        "pa": metar["pressure_altitude"],
+        "da": metar["density_altitude"],
+        "obs": maincode,
+        "tafraw": tafraw,
+        "time": dt.strftime("%Y-%m-%d %H:%M:%S %Z"),
     }
 
-def copy_static_files():
-    """Copy static files to output directory"""
+def render_html(data):
+    """Render Jinja template to HTML"""
+    env = Environment(loader=FileSystemLoader(TEMPLATE.parent))
+    env.globals['url_for'] = lambda endpoint, filename=None: f'static/{filename}' if filename else '#'
+    
+    template = env.get_template(TEMPLATE.name)
+    html = template.render(**data)
+    
+    HTML_OUT.parent.mkdir(parents=True, exist_ok=True)
+    HTML_OUT.write_text(html)
+    
+    # Copy static files
     import shutil
     static_src = Path("static")
     static_dst = Path("output/static")
-    
     if static_src.exists():
         shutil.copytree(static_src, static_dst, dirs_exist_ok=True)
-        print(f"✓ Copied static files")
-    else:
-        print("⚠ No static folder found")
 
-def render_html(template_path, weather_data, output_path):
-    """Render template to HTML"""
-    from jinja2 import Environment, FileSystemLoader
+def screenshot():
+    """Take screenshot with Selenium"""
+    options = Options()
+    options.add_argument('--headless')
+    options.add_argument('--disable-gpu')
+    options.add_argument('--no-sandbox')
     
-    # Set up Jinja2 environment with template directory
-    env = Environment(loader=FileSystemLoader(template_path.parent))
+    driver = webdriver.Chrome(options=options)
+    driver.set_window_size(820, 800)
+    driver.get(f'file://{HTML_OUT.absolute()}')
+    time.sleep(1)
     
-    # Add url_for function that returns static paths
-    def url_for(endpoint, filename=None, **values):
-        if endpoint == 'static' and filename:
-            return f'static/{filename}'
-        return '#'
-    
-    # Add url_for to globals
-    env.globals['url_for'] = url_for
-    
-    # Load and render template
-    template = env.get_template(template_path.name)
-    html_output = template.render(**weather_data)
-    
-    # Wrap everything to force viewport
-    viewport_wrapper = """
-    <meta name="viewport" content="width=800, height=480">
-    <style>
-        html {
-            width: 800px;
-            height: 480px;
-            margin: 0;
-            padding: 0;
-        }
-        body {
-            width: 800px;
-            height: 480px;
-            margin: 0 !important;
-            padding: 0 !important;
-            position: relative;
-            overflow: hidden;
-        }
-    </style>
-    """
-    
-    # Insert viewport in head
-    if '<head>' in html_output:
-        html_output = html_output.replace('<head>', '<head>' + viewport_wrapper)
-    else:
-        html_output = viewport_wrapper + html_output
-    
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(output_path, 'w') as f:
-        f.write(html_output)
-    
-    print(f"✓ HTML: {output_path}")
+    body = driver.find_element(By.TAG_NAME, 'body')
+    body.screenshot(str(PNG_OUT))
+    driver.quit()
 
-def html_to_png(html_path, png_path):
-    """Convert HTML to PNG"""
-    png_path.parent.mkdir(parents=True, exist_ok=True)
-    
-    # Try different screenshot tools
-    commands = [
-        ['wkhtmltoimage', 
-         '--width', str(DISPLAY_WIDTH), 
-         '--height', str(DISPLAY_HEIGHT),
-         '--quality', '100',
-         '--enable-local-file-access',
-         '--disable-smart-width',
-         str(html_path), 
-         str(png_path)],
-        ['chromium', 
-         '--headless', 
-         '--disable-gpu',
-         '--force-device-scale-factor=1',
-         '--hide-scrollbars',
-         f'--screenshot={png_path}', 
-         f'--window-size={DISPLAY_WIDTH},{DISPLAY_HEIGHT}',
-         f'--default-background-color=0',
-         f'file://{html_path.absolute()}'],
-        ['chromium-browser', 
-         '--headless', 
-         '--disable-gpu',
-         '--force-device-scale-factor=1',
-         '--hide-scrollbars',
-         f'--screenshot={png_path}', 
-         f'--window-size={DISPLAY_WIDTH},{DISPLAY_HEIGHT}',
-         f'--default-background-color=0',
-         f'file://{html_path.absolute()}'],
-    ]
-    
-    for cmd in commands:
-        try:
-            subprocess.run(cmd, check=True, capture_output=True)
-            print(f"✓ PNG: {png_path}")
-            
-            # Verify the image dimensions
-            from PIL import Image
-            img = Image.open(png_path)
-            print(f"  Image size: {img.size[0]}x{img.size[1]}")
-            
-            # If image is not the right size, resize it
-            if img.size != (DISPLAY_WIDTH, DISPLAY_HEIGHT):
-                print(f"  Resizing to {DISPLAY_WIDTH}x{DISPLAY_HEIGHT}")
-                img = img.resize((DISPLAY_WIDTH, DISPLAY_HEIGHT), Image.Resampling.LANCZOS)
-                img.save(png_path)
-            
-            return True
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            continue
-    
-    print("❌ No screenshot tool found (install wkhtmltoimage or chromium-browser)")
-    return False
-
-def display_on_epaper(image_path):
-    """Display image on e-paper"""
-    if not EPAPER_AVAILABLE:
-        print("⚠ E-paper display not available - skipping")
+def display():
+    """Show on e-paper display"""
+    if not HAS_DISPLAY:
+        print("⚠ Skipping display (no hardware)")
         return
     
-    try:
-        epd = EPD()
-        epd.init()
-        
-        image = Image.open(image_path)
-        if image.size != (800, 480):
-            image = image.resize((800, 480), Image.Resampling.LANCZOS)
-        
-        epd.display(epd.getbuffer(image))
-        epd.sleep()
-        
-        print("✓ Displayed on e-paper")
-    except Exception as e:
-        print(f"❌ E-paper error: {e}")
+    epd = EPD()
+    epd.init()
+    img = Image.open(PNG_OUT)
+    epd.display(epd.getbuffer(img))
+    epd.sleep()
 
-def update_cycle():
-    """Complete update cycle"""
+def update():
+    """Full update cycle"""
     print(f"\n{'='*60}")
     print(f"Update: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"{'='*60}")
     
     try:
-        token = API_KEY_PATH.read_text().strip()
+        print("Fetching weather...")
+        data = fetch_weather()
         
-        print(f"Fetching {AIRPORT}...")
-        weather_data = get_weather_data(AIRPORT, token)
-        if not weather_data:
-            return False
+        print("Rendering HTML...")
+        render_html(data)
         
-        # Copy static files (CSS, JS, images)
-        copy_static_files()
+        print("Taking screenshot...")
+        screenshot()
         
-        render_html(TEMPLATE_PATH, weather_data, HTML_OUTPUT)
-        
-        if not html_to_png(HTML_OUTPUT, PNG_OUTPUT):
-            return False
-        
-        display_on_epaper(PNG_OUTPUT)
+        print("Displaying on e-paper...")
+        display()
         
         print("✅ Update complete!")
-        return True
         
     except Exception as e:
         print(f"❌ Error: {e}")
-        return False
-
-def cleanup_display():
-    """Clear and sleep the e-paper display on exit"""
-    if not EPAPER_AVAILABLE:
-        return
-    
-    try:
-        print("\nClearing e-paper display...")
-        epd = EPD()
-        epd.init()
-        epd.Clear()
-        epd.sleep()
-        print("✓ Display cleared and sleeping")
-    except Exception as e:
-        print(f"⚠ Could not clear display: {e}")
-
-def main():
-    """Main loop"""
-    print(f"Weather Dashboard - {AIRPORT}")
-    print(f"Update every {UPDATE_INTERVAL//60} minutes")
-    
-    try:
-        while True:
-            update_cycle()
-            print(f"\nNext update in {UPDATE_INTERVAL} seconds...")
-            time.sleep(UPDATE_INTERVAL)
-    except KeyboardInterrupt:
-        print("\n\nStopped by user")
-        cleanup_display()
-    except Exception as e:
-        print(f"\n❌ Fatal error: {e}")
-        cleanup_display()
-        raise
 
 if __name__ == "__main__":
-    try:
-        update_cycle()
-        
-        response = input("\nRun continuous updates? (y/n): ")
-        if response.lower() == 'y':
-            main()
-        else:
-            print("Single update complete.")
-            cleanup_display()
-    except KeyboardInterrupt:
-        print("\n\nStopped by user")
-        cleanup_display()
+    # Run once
+    update()
+    
+    # Ask about continuous updates
+    response = input("\nRun continuous updates every 5 minutes? (y/n): ")
+    if response.lower() == 'y':
+        while True:
+            time.sleep(UPDATE_INTERVAL)
+            update()
