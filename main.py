@@ -146,36 +146,32 @@ def render_html(template_path, weather_data, output_path):
     template = env.get_template(template_path.name)
     html_output = template.render(**weather_data)
     
-    # Force exact dimensions with inline styles
-    dimension_fix = """
+    # Wrap everything to force viewport
+    viewport_wrapper = """
+    <meta name="viewport" content="width=800, height=480">
     <style>
-        html, body {
-            width: 800px !important;
-            height: 480px !important;
-            min-height: 480px !important;
-            max-height: 480px !important;
+        html {
+            width: 800px;
+            height: 480px;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            width: 800px;
+            height: 480px;
             margin: 0 !important;
             padding: 0 !important;
-            overflow: hidden !important;
-        }
-        .container {
-            width: 800px !important;
-            height: 480px !important;
-            min-height: 480px !important;
-            max-height: 480px !important;
-            box-sizing: border-box !important;
-            border: 5px solid red !important;
+            position: relative;
+            overflow: hidden;
         }
     </style>
     """
     
-    # Insert before </head> or </body>
-    if '</head>' in html_output:
-        html_output = html_output.replace('</head>', dimension_fix + '</head>')
-    elif '<body>' in html_output:
-        html_output = html_output.replace('<body>', '<body>' + dimension_fix)
+    # Insert viewport in head
+    if '<head>' in html_output:
+        html_output = html_output.replace('<head>', '<head>' + viewport_wrapper)
     else:
-        html_output = dimension_fix + html_output
+        html_output = viewport_wrapper + html_output
     
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with open(output_path, 'w') as f:
