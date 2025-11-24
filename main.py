@@ -153,6 +153,9 @@ def html_to_png(html_path, png_path):
     commands = [
         ['wkhtmltoimage', '--width', str(DISPLAY_WIDTH), '--height', str(DISPLAY_HEIGHT),
          '--quality', '100', str(html_path), str(png_path)],
+        ['chromium', '--headless', '--disable-gpu',
+         f'--screenshot={png_path}', f'--window-size={DISPLAY_WIDTH},{DISPLAY_HEIGHT}',
+         f'file://{html_path.absolute()}'],
         ['chromium-browser', '--headless', '--disable-gpu',
          f'--screenshot={png_path}', f'--window-size={DISPLAY_WIDTH},{DISPLAY_HEIGHT}',
          f'file://{html_path.absolute()}'],
