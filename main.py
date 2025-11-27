@@ -12,6 +12,8 @@ import time
 import subprocess
 from PIL import Image
 import sys
+import threading
+import select
 
 # Configuration
 API_KEY = Path("API_keys/avwxkeys.txt").read_text().strip()
@@ -23,6 +25,9 @@ UPDATE_INTERVAL = 300  # 5 minutes
 
 # Cache for last displayed data
 LAST_DATA = None
+
+# Flag for new airport entered
+NEW_AIRPORT = None
 
 # Try to import e-paper display
 try:
@@ -241,13 +246,38 @@ def clear_display():
         print(f"❌ Error clearing display: {e}")
 
 
+def input_listener():
+    """Listen for airport code input in background"""
+    global NEW_AIRPORT
+    
+    while True:
+        try:
+            user_input = input().strip().upper()
+            if user_input:
+                if len(user_input) == 4:
+                    NEW_AIRPORT = user_input
+                    print(f"\n✈ New airport queued: {NEW_AIRPORT} (will update at next cycle)")
+                elif user_input == 'Q' or user_input == 'QUIT':
+                    raise KeyboardInterrupt
+                else:
+                    print(f"⚠ Invalid airport code: {user_input} (should be 4 characters like KGEG)")
+        except EOFError:
+            break
+
+
 if __name__ == "__main__":
-    # Check for command line argument
+    # Check for command line argument first
     if len(sys.argv) > 1:
         arg = sys.argv[1].strip().upper()
         if len(arg) == 4:
             CURRENT_AIRPORT = arg
-            print(f"✈ Starting with airport: {CURRENT_AIRPORT}")
+    else:
+        # Ask for airport
+        airport_input = input(f"Enter airport code [{CURRENT_AIRPORT}]: ").strip().upper()
+        if airport_input and len(airport_input) == 4:
+            CURRENT_AIRPORT = airport_input
+    
+    print(f"✈ Using airport: {CURRENT_AIRPORT}")
     
     try:
         # Run once
@@ -257,11 +287,24 @@ if __name__ == "__main__":
         response = input("\nRun continuous updates every 5 minutes? (y/n): ")
         if response.lower() == 'y':
             print(f"\nRunning continuous updates for {CURRENT_AIRPORT}")
+            print("Type a new airport code (e.g., KGEG) to change")
             print("Press Ctrl+C to stop")
             print("-" * 40)
             
+            # Start input listener in background
+            listener = threading.Thread(target=input_listener, daemon=True)
+            listener.start()
+            
             while True:
                 time.sleep(UPDATE_INTERVAL)
+                
+                # Check if new airport was entered
+                if NEW_AIRPORT:
+                    CURRENT_AIRPORT = NEW_AIRPORT
+                    NEW_AIRPORT = None
+                    LAST_DATA = None  # Force refresh for new airport
+                    print(f"\n✈ Switching to: {CURRENT_AIRPORT}")
+                
                 update()
                 
     except KeyboardInterrupt:
