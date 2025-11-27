@@ -25,6 +25,9 @@ UPDATE_INTERVAL = 300  # 5 minutes
 # Flag for immediate update
 UPDATE_NOW = False
 
+# Cache for last displayed data
+LAST_DATA = None
+
 # Try to import e-paper display
 try:
     from waveshare_epd.epd7in3f import EPD
@@ -174,15 +177,39 @@ def display():
     epd.display(epd.getbuffer(img))
     epd.sleep()
 
-def update():
+def data_changed(new_data):
+    """Check if weather data has changed (ignoring timestamp)"""
+    global LAST_DATA
+    
+    if LAST_DATA is None:
+        return True
+    
+    # Compare all fields except time
+    for key in new_data:
+        if key == 'time':
+            continue
+        if new_data[key] != LAST_DATA.get(key):
+            return True
+    
+    return False
+
+
+def update(force_refresh=False):
     """Full update cycle"""
+    global LAST_DATA
+    
     print(f"\n{'='*60}")
-    print(f"Update: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"Update: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - {CURRENT_AIRPORT}")
     print(f"{'='*60}")
     
     try:
         print("Fetching weather...")
         data = fetch_weather()
+        
+        # Check if data has changed
+        if not force_refresh and not data_changed(data):
+            print("📊 No changes detected - skipping display refresh")
+            return
         
         print("Rendering HTML...")
         render_html(data)
@@ -193,6 +220,9 @@ def update():
         
         print("Displaying on e-paper...")
         display()
+        
+        # Update the cache
+        LAST_DATA = data.copy()
         
         print("✅ Update complete!")
         
@@ -217,7 +247,7 @@ def clear_display():
 
 def input_listener():
     """Listen for airport code input in background"""
-    global CURRENT_AIRPORT, UPDATE_NOW
+    global CURRENT_AIRPORT, UPDATE_NOW, LAST_DATA
     
     while True:
         try:
@@ -225,6 +255,7 @@ def input_listener():
             if user_input:
                 if len(user_input) == 4 and user_input[0] == 'K':
                     CURRENT_AIRPORT = user_input
+                    LAST_DATA = None  # Force refresh for new airport
                     print(f"\n✈ Airport changed to: {CURRENT_AIRPORT}")
                     UPDATE_NOW = True
                 elif user_input == 'Q' or user_input == 'QUIT':
