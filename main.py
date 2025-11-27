@@ -11,14 +11,19 @@ from datetime import datetime
 import time
 import subprocess
 from PIL import Image
+import threading
+import sys
 
 # Configuration
 API_KEY = Path("API_keys/avwxkeys.txt").read_text().strip()
-AIRPORT = "KSKA"
+CURRENT_AIRPORT = "KSKA"  # Default airport
 TEMPLATE = Path("templates/page.html")
 HTML_OUT = Path("output/weather.html")
 PNG_OUT = Path("output/weather.png")
 UPDATE_INTERVAL = 300  # 5 minutes
+
+# Flag for immediate update
+UPDATE_NOW = False
 
 # Try to import e-paper display
 try:
@@ -30,23 +35,24 @@ except:
 
 def fetch_weather():
     """Get weather data from AVWX API"""
+    global CURRENT_AIRPORT
     headers = {"Authorization": f"Bearer {API_KEY}"}
     
     # Get METAR
-    metar = requests.get(f"https://avwx.rest/api/metar/{AIRPORT}?remove=true", 
+    metar = requests.get(f"https://avwx.rest/api/metar/{CURRENT_AIRPORT}?remove=true", 
                          headers=headers, timeout=10).json()
     
     # Get Station
     try:
-        station = requests.get(f"https://avwx.rest/api/station/{AIRPORT}", 
+        station = requests.get(f"https://avwx.rest/api/station/{CURRENT_AIRPORT}", 
                               headers=headers, timeout=10).json()
         arpt_name = station["name"]
     except:
-        arpt_name = AIRPORT
+        arpt_name = CURRENT_AIRPORT
     
     # Get TAF
     try:
-        taf = requests.get(f"https://avwx.rest/api/taf/{AIRPORT}", 
+        taf = requests.get(f"https://avwx.rest/api/taf/{CURRENT_AIRPORT}", 
                           headers=headers, timeout=10).json()
         tafraw = [line["sanitized"] for line in taf["forecast"]]
     except:
@@ -193,13 +199,78 @@ def update():
     except Exception as e:
         print(f"❌ Error: {e}")
 
-if __name__ == "__main__":
-    # Run once
-    update()
+def clear_display():
+    """Clear the e-paper display and put it to sleep"""
+    if not HAS_DISPLAY:
+        print("⚠ No display to clear")
+        return
     
-    # Ask about continuous updates
-    response = input("\nRun continuous updates every 5 minutes? (y/n): ")
-    if response.lower() == 'y':
-        while True:
-            time.sleep(UPDATE_INTERVAL)
-            update()
+    try:
+        epd = EPD()
+        epd.init()
+        epd.Clear()
+        epd.sleep()
+        print("✅ Display cleared and sleeping")
+    except Exception as e:
+        print(f"❌ Error clearing display: {e}")
+
+
+def input_listener():
+    """Listen for airport code input in background"""
+    global CURRENT_AIRPORT, UPDATE_NOW
+    
+    while True:
+        try:
+            user_input = input().strip().upper()
+            if user_input:
+                if len(user_input) == 4 and user_input[0] == 'K':
+                    CURRENT_AIRPORT = user_input
+                    print(f"\n✈ Airport changed to: {CURRENT_AIRPORT}")
+                    UPDATE_NOW = True
+                elif user_input == 'Q' or user_input == 'QUIT':
+                    print("\n🛑 Quit command received...")
+                    raise KeyboardInterrupt
+                else:
+                    print(f"⚠ Invalid airport code: {user_input} (should be like KGEG)")
+        except EOFError:
+            break
+
+
+if __name__ == "__main__":
+    # Check for command line argument
+    if len(sys.argv) > 1:
+        arg = sys.argv[1].strip().upper()
+        if len(arg) == 4:
+            CURRENT_AIRPORT = arg
+            print(f"✈ Starting with airport: {CURRENT_AIRPORT}")
+    
+    try:
+        # Run once
+        update()
+        
+        # Ask about continuous updates
+        response = input("\nRun continuous updates every 5 minutes? (y/n): ")
+        if response.lower() == 'y':
+            print(f"\nRunning continuous updates for {CURRENT_AIRPORT}")
+            print("Commands:")
+            print("  - Type an airport code (e.g., KGEG) to change airport")
+            print("  - Press Ctrl+C or type 'quit' to stop")
+            print("-" * 40)
+            
+            # Start input listener in background thread
+            listener = threading.Thread(target=input_listener, daemon=True)
+            listener.start()
+            
+            last_update = time.time()
+            while True:
+                # Check if we need to update (either timer or airport changed)
+                if UPDATE_NOW or (time.time() - last_update >= UPDATE_INTERVAL):
+                    UPDATE_NOW = False
+                    last_update = time.time()
+                    update()
+                time.sleep(1)  # Check every second
+                
+    except KeyboardInterrupt:
+        print("\n\n🛑 Stopping...")
+    finally:
+        clear_display()
