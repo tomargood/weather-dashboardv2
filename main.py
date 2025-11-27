@@ -11,7 +11,6 @@ from datetime import datetime
 import time
 import subprocess
 from PIL import Image
-import threading
 import sys
 
 # Configuration
@@ -21,9 +20,6 @@ TEMPLATE = Path("templates/page.html")
 HTML_OUT = Path("output/weather.html")
 PNG_OUT = Path("output/weather.png")
 UPDATE_INTERVAL = 300  # 5 minutes
-
-# Flag for immediate update
-UPDATE_NOW = False
 
 # Cache for last displayed data
 LAST_DATA = None
@@ -245,28 +241,6 @@ def clear_display():
         print(f"❌ Error clearing display: {e}")
 
 
-def input_listener():
-    """Listen for airport code input in background"""
-    global CURRENT_AIRPORT, UPDATE_NOW, LAST_DATA
-    
-    while True:
-        try:
-            user_input = input().strip().upper()
-            if user_input:
-                if len(user_input) == 4 and user_input[0] == 'K':
-                    CURRENT_AIRPORT = user_input
-                    LAST_DATA = None  # Force refresh for new airport
-                    print(f"\n✈ Airport changed to: {CURRENT_AIRPORT}")
-                    UPDATE_NOW = True
-                elif user_input == 'Q' or user_input == 'QUIT':
-                    print("\n🛑 Quit command received...")
-                    raise KeyboardInterrupt
-                else:
-                    print(f"⚠ Invalid airport code: {user_input} (should be like KGEG)")
-        except EOFError:
-            break
-
-
 if __name__ == "__main__":
     # Check for command line argument
     if len(sys.argv) > 1:
@@ -283,23 +257,12 @@ if __name__ == "__main__":
         response = input("\nRun continuous updates every 5 minutes? (y/n): ")
         if response.lower() == 'y':
             print(f"\nRunning continuous updates for {CURRENT_AIRPORT}")
-            print("Commands:")
-            print("  - Type an airport code (e.g., KGEG) to change airport")
-            print("  - Press Ctrl+C or type 'quit' to stop")
+            print("Press Ctrl+C to stop")
             print("-" * 40)
             
-            # Start input listener in background thread
-            listener = threading.Thread(target=input_listener, daemon=True)
-            listener.start()
-            
-            last_update = time.time()
             while True:
-                # Check if we need to update (either timer or airport changed)
-                if UPDATE_NOW or (time.time() - last_update >= UPDATE_INTERVAL):
-                    UPDATE_NOW = False
-                    last_update = time.time()
-                    update()
-                time.sleep(1)  # Check every second
+                time.sleep(UPDATE_INTERVAL)
+                update()
                 
     except KeyboardInterrupt:
         print("\n\n🛑 Stopping...")
