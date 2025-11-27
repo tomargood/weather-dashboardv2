@@ -56,6 +56,13 @@ def fetch_weather():
     winddir = metar["wind_direction"]["value"]
     aarowdir = str((winddir + 180) % 360) + "deg"
     
+    # Format wind direction with leading zeros (e.g., 040)
+    winddir_formatted = f"{winddir:03d}"
+    
+    # Format pressure to always show 4 digits (e.g., 29.10)
+    pressure = metar["altimeter"]["value"]
+    pressure_formatted = f"{pressure:.2f}"
+    
     wxcodes = metar["wx_codes"]
     maincode = wxcodes[0]["value"] if wxcodes else None
     if not maincode:
@@ -70,12 +77,12 @@ def fetch_weather():
         "rules": metar["flight_rules"],
         "vis": metar["visibility"]["repr"],
         "cig": [layer["repr"] for layer in metar["clouds"]],
-        "px": metar["altimeter"]["value"],
+        "px": pressure_formatted,
         "temp": metar["temperature"]["value"],
         "dewpt": metar["dewpoint"]["value"],
         "wind": metar["wind_speed"]["value"],
         "gust": metar["wind_gust"],
-        "winddir": winddir,
+        "winddir": winddir_formatted,
         "aarowdir": aarowdir,
         "wxcode": [code["repr"] for code in wxcodes],
         "pa": metar["pressure_altitude"],
