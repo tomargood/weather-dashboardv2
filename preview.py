@@ -291,7 +291,7 @@ def take_screenshot():
         options.add_argument("--force-device-scale-factor=1")
         
         driver = webdriver.Chrome(options=options)
-        driver.set_window_size(780, 500)
+        driver.set_window_size(780, 635)
         driver.get(f"file://{HTML_OUT.absolute()}")
         driver.save_screenshot(str(PNG_OUT))
         driver.quit()
