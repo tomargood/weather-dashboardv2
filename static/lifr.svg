@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <!-- LIFR - Dense fog - white/light elements on gray background -->
+  
+  <!-- Fog layers - horizontal bars with white fill and black outline -->
+  <rect x="5" y="15" width="90" height="10" rx="5" fill="#FFF" stroke="#000" stroke-width="2"/>
+  <rect x="10" y="32" width="80" height="10" rx="5" fill="#FFF" stroke="#000" stroke-width="2"/>
+  <rect x="5" y="49" width="90" height="10" rx="5" fill="#FFF" stroke="#000" stroke-width="2"/>
+  <rect x="12" y="66" width="76" height="10" rx="5" fill="#FFF" stroke="#000" stroke-width="2"/>
+  <rect x="5" y="83" width="90" height="10" rx="5" fill="#FFF" stroke="#000" stroke-width="2"/>
+</svg>

@@ -1,265 +1,438 @@
 #!/usr/bin/env python3
 """
-Preview the weather dashboard on Mac without e-paper display
-Generates HTML and PNG, then opens them for viewing
+Weather Dashboard - Local Testing Version
+=========================================
+Run this on your local machine to preview the e-paper display
+before deploying to the Raspberry Pi.
+
+Features:
+- Mock data mode (no API key required)
+- Live data mode (with API key)
+- Browser preview
+- Optional screenshot generation
 """
 
 from pathlib import Path
 from jinja2 import Environment, FileSystemLoader
-import requests
 from datetime import datetime
-import subprocess
-from PIL import Image, ImageDraw, ImageFont
+import webbrowser
+import argparse
+import shutil
+import http.server
+import socketserver
+import threading
 
 # Configuration
-API_KEY_PATH = Path("API_keys/avwxkeys.txt")
-AIRPORT = "KSKA"
-HTML_OUTPUT = Path("output/weather.html")
-PNG_OUTPUT = Path("output/weather_preview.png")
-TEMPLATE_PATH = Path("templates/page.html")
+DEFAULT_AIRPORT = "KSKA"
+TEMPLATE = Path("templates/page.html")
+HTML_OUT = Path("output/weather.html")
+PNG_OUT = Path("output/weather.png")
+PORT = 8080
 
-# Display dimensions
-DISPLAY_WIDTH = 800
-DISPLAY_HEIGHT = 480
+# ============================================================================
+# MOCK DATA - Edit this to test different weather scenarios
+# ============================================================================
 
-def get_weather_data(airport, token):
-    """Fetch weather data"""
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Accept": "application/json"
-    }
+MOCK_SCENARIOS = {
+    "clear": {
+        "arpt": "KSKA",
+        "ArptName": "Spokane International Airport",
+        "rules": "VFR",
+        "vis": "10SM",
+        "cig": ["SKC"],
+        "px": 30.12,
+        "temp": 22,
+        "dewpt": 10,
+        "wind": 8,
+        "gust": None,
+        "winddir": 270,
+        "aarowdir": "90deg",
+        "wxcode": [],
+        "pa": 2500,
+        "da": 3200,
+        "obs": "SKY CLEAR",
+        "tafraw": [
+            "FM121800 27008KT P6SM SKC",
+            "FM130000 VRB03KT P6SM SKC",
+            "FM131500 28012KT P6SM FEW080"
+        ],
+        "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC"),
+    },
+    "ifr": {
+        "arpt": "KSKA",
+        "ArptName": "Spokane International Airport",
+        "rules": "IFR",
+        "vis": "1SM",
+        "cig": ["BKN003", "OVC010"],
+        "px": 29.85,
+        "temp": 8,
+        "dewpt": 7,
+        "wind": 12,
+        "gust": 20,
+        "winddir": 180,
+        "aarowdir": "0deg",
+        "wxcode": ["BR", "FG"],
+        "pa": 2600,
+        "da": 2800,
+        "obs": "FG",
+        "tafraw": [
+            "FM121800 18012G20KT 1SM BR BKN003 OVC010",
+            "FM130600 VRB05KT 3SM BR SCT010 BKN020",
+            "FM131400 27008KT P6SM SCT030"
+        ],
+        "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC"),
+    },
+    "mvfr": {
+        "arpt": "KSKA",
+        "ArptName": "Spokane International Airport",
+        "rules": "MVFR",
+        "vis": "5SM",
+        "cig": ["SCT015", "BKN025"],
+        "px": 29.92,
+        "temp": 15,
+        "dewpt": 12,
+        "wind": 15,
+        "gust": None,
+        "winddir": 320,
+        "aarowdir": "140deg",
+        "wxcode": ["HZ"],
+        "pa": 2550,
+        "da": 3000,
+        "obs": "CLOUDY",
+        "tafraw": [
+            "FM121800 32015KT 5SM HZ SCT015 BKN025",
+            "FM130300 30010KT P6SM SCT030",
+            "FM131200 28008KT P6SM FEW040"
+        ],
+        "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC"),
+    },
+    "stormy": {
+        "arpt": "KSKA",
+        "ArptName": "Spokane International Airport",
+        "rules": "LIFR",
+        "vis": "1/2SM",
+        "cig": ["BKN005", "OVC012CB"],
+        "px": 29.45,
+        "temp": 18,
+        "dewpt": 17,
+        "wind": 25,
+        "gust": 40,
+        "winddir": 230,
+        "aarowdir": "50deg",
+        "wxcode": ["+TSRA", "FG"],
+        "pa": 2700,
+        "da": 3500,
+        "obs": "+TSRA",
+        "tafraw": [
+            "FM121800 23025G40KT 1/2SM +TSRA BKN005 OVC012CB",
+            "FM122200 25015G25KT 2SM TSRA BKN010 OVC020",
+            "FM130400 27010KT 5SM -RA SCT015 BKN030"
+        ],
+        "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC"),
+    },
+}
+
+
+def get_mock_data(scenario="clear"):
+    """Get mock weather data for testing"""
+    if scenario not in MOCK_SCENARIOS:
+        print(f"Unknown scenario '{scenario}'. Available: {list(MOCK_SCENARIOS.keys())}")
+        scenario = "clear"
     
-    url_metar = f"https://avwx.rest/api/metar/{airport}?remove=true"
-    url_station = f"https://avwx.rest/api/station/{airport}"
-    url_taf = f"https://avwx.rest/api/taf/{airport}"
+    data = MOCK_SCENARIOS[scenario].copy()
+    data["time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")
+    return data
+
+
+def fetch_live_weather(airport, debug=False):
+    """Get real weather data from AVWX API (requires API key)"""
+    import requests
+    import json
     
+    api_key_file = Path("API_keys/avwxkeys.txt")
+    if not api_key_file.exists():
+        raise FileNotFoundError(
+            f"API key not found at {api_key_file}\n"
+            "Use --mock flag to test with mock data instead."
+        )
+    
+    API_KEY = api_key_file.read_text().strip()
+    headers = {"Authorization": f"Bearer {API_KEY}"}
+    
+    # Get METAR
+    metar = requests.get(
+        f"https://avwx.rest/api/metar/{airport}?remove=true",
+        headers=headers, timeout=10
+    ).json()
+    
+    # Get Station name
     try:
-        response = requests.get(url_metar, headers=headers, timeout=10)
-        response.raise_for_status()
-        data = response.json()
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching METAR: {e}")
-        return None
-    
-    try:
-        response1 = requests.get(url_station, headers=headers, timeout=10)
-        response1.raise_for_status()
-        data1 = response1.json()
-        arpt_name = data1["name"]
+        station = requests.get(
+            f"https://avwx.rest/api/station/{airport}",
+            headers=headers, timeout=10
+        ).json()
+        arpt_name = station["name"]
     except:
         arpt_name = airport
     
+    # Get TAF
+    taf_raw_json = None
     try:
-        response2 = requests.get(url_taf, headers=headers, timeout=10)
-        response2.raise_for_status()
-        data2 = response2.json()
-        tafraw = [line["sanitized"] for line in data2["forecast"]]
+        taf = requests.get(
+            f"https://avwx.rest/api/taf/{airport}",
+            headers=headers, timeout=10
+        ).json()
+        taf_raw_json = taf
+        tafraw = [line["sanitized"] for line in taf["forecast"]]
     except:
         tafraw = ["TAF not available"]
     
-    # Extract all weather data
-    arpt = data["station"]
-    flight_rules = data["flight_rules"]
-    vis = data["visibility"]["repr"]
-    cig = data["clouds"]
-    px = data["altimeter"]["value"]
-    temp = data["temperature"]["value"]
-    dewpt = data["dewpoint"]["value"]
-    wind = data["wind_speed"]["value"]
-    gust = data["wind_gust"]
-    winddir = data["wind_direction"]["value"]
-    pa = data["pressure_altitude"]
-    da = data["density_altitude"]
+    # Debug output
+    if debug:
+        print("\n" + "="*60)
+        print("RAW TAF JSON:")
+        print("="*60)
+        print(json.dumps(taf_raw_json, indent=2))
+        print("="*60)
+        print("\nPARSED tafraw list:")
+        for i, line in enumerate(tafraw):
+            print(f"  [{i}] '{line}'")
+        print("="*60 + "\n")
     
-    cloudlayers = [layer["repr"] for layer in cig]
+    # Extract weather data
+    winddir = metar["wind_direction"]["value"]
     aarowdir = str((winddir + 180) % 360) + "deg"
     
-    wxcodes = data["wx_codes"]
-    wxcode = [code["repr"] for code in wxcodes]
+    wxcodes = metar["wx_codes"]
     maincode = wxcodes[0]["value"] if wxcodes else None
-    
     if not maincode:
-        has_low_clouds = any(layer.get("altitude", 999) < 100 for layer in cig)
+        has_low_clouds = any(
+            layer.get("altitude", 999) < 100 
+            for layer in metar["clouds"]
+        )
         maincode = "CLOUDY" if has_low_clouds else "SKY CLEAR"
     
-    ts = data["time"]["dt"]
-    dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
-    updatetime = dt.strftime("%Y-%m-%d %H:%M:%S %Z")
+    dt = datetime.fromisoformat(metar["time"]["dt"].replace("Z", "+00:00"))
     
     return {
-        "tafraw": tafraw, "time": updatetime, "aarowdir": aarowdir,
-        "rules": flight_rules, "arpt": arpt, "ArptName": arpt_name,
-        "vis": vis, "cig": cloudlayers, "px": px, "temp": temp,
-        "dewpt": dewpt, "wind": wind, "gust": gust, "winddir": winddir,
-        "wxcode": wxcode, "pa": pa, "da": da, "obs": maincode,
+        "arpt": metar["station"],
+        "ArptName": arpt_name,
+        "rules": metar["flight_rules"],
+        "vis": metar["visibility"]["repr"],
+        "cig": [layer["repr"] for layer in metar["clouds"]],
+        "px": metar["altimeter"]["value"],
+        "temp": metar["temperature"]["value"],
+        "dewpt": metar["dewpoint"]["value"],
+        "wind": metar["wind_speed"]["value"],
+        "gust": metar["wind_gust"],
+        "winddir": winddir,
+        "aarowdir": aarowdir,
+        "wxcode": [code["repr"] for code in wxcodes],
+        "pa": metar["pressure_altitude"],
+        "da": metar["density_altitude"],
+        "obs": maincode,
+        "tafraw": tafraw,
+        "time": dt.strftime("%Y-%m-%d %H:%M:%S %Z"),
     }
 
-def copy_static_files():
-    """Copy static files to output directory"""
-    import shutil
+
+def render_html(data):
+    """Render Jinja template to HTML"""
+    if not TEMPLATE.exists():
+        raise FileNotFoundError(
+            f"Template not found at {TEMPLATE}\n"
+            "Please create your template or copy it from the Pi."
+        )
+    
+    env = Environment(loader=FileSystemLoader(TEMPLATE.parent))
+    env.globals['url_for'] = lambda endpoint, filename=None: f'static/{filename}' if filename else '#'
+    
+    template = env.get_template(TEMPLATE.name)
+    html = template.render(**data)
+    
+    HTML_OUT.parent.mkdir(parents=True, exist_ok=True)
+    HTML_OUT.write_text(html)
+    
+    # Copy static files
     static_src = Path("static")
     static_dst = Path("output/static")
-    
     if static_src.exists():
         shutil.copytree(static_src, static_dst, dirs_exist_ok=True)
-        print(f"✓ Copied static files")
+    
+    return HTML_OUT
 
-def render_html(template_path, weather_data, output_path):
-    """Render template to HTML"""
-    env = Environment(loader=FileSystemLoader(template_path.parent))
-    
-    def url_for(endpoint, filename=None, **values):
-        if endpoint == 'static' and filename:
-            return f'static/{filename}'
-        return '#'
-    
-    env.globals['url_for'] = url_for
-    template = env.get_template(template_path.name)
-    html_output = template.render(**weather_data)
-    
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(output_path, 'w') as f:
-        f.write(html_output)
-    
-    print(f"✓ HTML: {output_path}")
 
-def create_preview_png():
-    """Create a PNG screenshot using Chromium - try different window sizes"""
-    
-    print("\nTaking screenshot with Chromium...")
-    
-    # Find chromium
-    chromium_paths = [
-        'chromium',
-        '/Applications/Chromium.app/Contents/MacOS/Chromium',
-        '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-        '/opt/homebrew/bin/chromium',
-    ]
-    
-    chromium_cmd = None
-    for path in chromium_paths:
-        try:
-            if path.startswith('/'):
-                if Path(path).exists():
-                    chromium_cmd = path
-                    break
-            else:
-                result = subprocess.run(['which', path], capture_output=True, text=True)
-                if result.returncode == 0:
-                    chromium_cmd = path
-                    break
-        except:
-            continue
-    
-    if not chromium_cmd:
-        print("❌ Chromium not found!")
-        print("   Install with: brew install chromium")
-        return False
-    
-    print(f"Using: {chromium_cmd}")
-    
-    # Try different window sizes
-    window_sizes = [
-        (800, 480, "Exact"),
-        (850, 500, "Slightly larger"),
-        (900, 600, "Larger"),
-        (1000, 700, "Much larger"),
-        (1200, 900, "Extra large"),
-    ]
-    
-    for width, height, description in window_sizes:
-        print(f"\nTrying {width}x{height} ({description})...")
+def take_screenshot():
+    """Take a screenshot using available browser"""
+    try:
+        from playwright.sync_api import sync_playwright
         
-        try:
-            result = subprocess.run([
-                chromium_cmd,
-                '--headless',
-                '--disable-gpu',
-                '--no-sandbox',
-                '--force-device-scale-factor=1',
-                '--hide-scrollbars',
-                f'--screenshot={PNG_OUTPUT.absolute()}',
-                f'file://{HTML_OUTPUT.absolute()}'
-            ], capture_output=True, timeout=30)
-            
-            if PNG_OUTPUT.exists():
-                from PIL import Image, ImageDraw, ImageFont
-                img = Image.open(PNG_OUTPUT)
-                print(f"  Captured: {img.size[0]}x{img.size[1]}")
-                
-                # Check if close to target
-                if img.size[0] >= 750 and img.size[1] >= 450:
-                    print(f"  ✓ Good size! Using {width}x{height}")
-                    
-                    # Resize to exact 800x480
-                    if img.size != (DISPLAY_WIDTH, DISPLAY_HEIGHT):
-                        img = img.resize((DISPLAY_WIDTH, DISPLAY_HEIGHT), Image.Resampling.LANCZOS)
-                        print(f"  Resized to: {DISPLAY_WIDTH}x{DISPLAY_HEIGHT}")
-                    
-                    # Add border
-                    draw = ImageDraw.Draw(img)
-                    draw.rectangle([0, 0, DISPLAY_WIDTH-1, DISPLAY_HEIGHT-1], outline='red', width=3)
-                    
-                    try:
-                        font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 16)
-                    except:
-                        font = ImageFont.load_default()
-                    
-                    draw.text((10, 10), f"{DISPLAY_WIDTH}x{DISPLAY_HEIGHT}", fill='red', font=font)
-                    draw.text((10, DISPLAY_HEIGHT-25), f"Window: {width}x{height}", fill='red', font=font)
-                    
-                    img.save(PNG_OUTPUT)
-                    print(f"✓ Preview PNG saved: {PNG_OUTPUT}")
-                    return True
-                else:
-                    print(f"  ✗ Too small, trying larger...")
-                    
-        except subprocess.TimeoutExpired:
-            print(f"  ✗ Timeout")
-        except Exception as e:
-            print(f"  ✗ Error: {e}")
-    
-    print("\n❌ Could not capture good screenshot with any window size")
-    return False
-
-def main():
-    print("Weather Dashboard Preview")
-    print("=" * 60)
+        with sync_playwright() as p:
+            browser = p.chromium.launch()
+            page = browser.new_page(viewport={"width": 780, "height": 500})
+            page.goto(f"file://{HTML_OUT.absolute()}")
+            page.screenshot(path=str(PNG_OUT))
+            browser.close()
+        
+        print(f"  ✓ Screenshot saved: {PNG_OUT}")
+        return True
+        
+    except ImportError:
+        print("  ℹ Playwright not installed. Trying Selenium...")
     
     try:
-        token = API_KEY_PATH.read_text().strip()
+        from selenium import webdriver
+        from selenium.webdriver.chrome.options import Options
         
-        print(f"\nFetching weather for {AIRPORT}...")
-        weather_data = get_weather_data(AIRPORT, token)
-        if not weather_data:
-            print("❌ Failed to fetch weather data")
-            return
+        options = Options()
+        options.add_argument("--headless")
+        options.add_argument("--window-size=780,500")
+        options.add_argument("--hide-scrollbars")
+        options.add_argument("--force-device-scale-factor=1")
         
-        print("Rendering HTML...")
-        copy_static_files()
-        render_html(TEMPLATE_PATH, weather_data, HTML_OUTPUT)
+        driver = webdriver.Chrome(options=options)
+        driver.set_window_size(780, 500)
+        driver.get(f"file://{HTML_OUT.absolute()}")
+        driver.save_screenshot(str(PNG_OUT))
+        driver.quit()
         
-        print("Creating preview PNG...")
-        png_created = create_preview_png()
+        print(f"  ✓ Screenshot saved: {PNG_OUT}")
+        return True
         
-        print("\n" + "=" * 60)
-        print("✅ Preview generated!")
-        print(f"HTML: {HTML_OUTPUT}")
-        if png_created:
-            print(f"PNG:  {PNG_OUTPUT}")
-        
-        # Open in browser
-        print("\nOpening preview in browser...")
-        subprocess.run(['open', str(HTML_OUTPUT)])
-        
-        if png_created:
-            print("Opening PNG...")
-            subprocess.run(['open', str(PNG_OUTPUT)])
-        
+    except ImportError:
+        print("  ℹ Selenium not installed. Skipping screenshot.")
+        print("  ℹ Install with: pip install playwright && playwright install")
+        print("  ℹ Or: pip install selenium webdriver-manager")
+        return False
     except Exception as e:
-        print(f"\n❌ Error: {e}")
-        import traceback
-        traceback.print_exc()
+        print(f"  ✗ Screenshot failed: {e}")
+        return False
+
+
+def serve_and_open(port=PORT):
+    """Start a local server and open browser"""
+    
+    class QuietHandler(http.server.SimpleHTTPRequestHandler):
+        def log_message(self, format, *args):
+            pass  # Suppress logging
+    
+    class ReusableTCPServer(socketserver.TCPServer):
+        allow_reuse_address = True
+    
+    # Change to output directory
+    import os
+    original_dir = os.getcwd()
+    os.chdir("output")
+    
+    # Try the requested port, then fall back to alternatives
+    for try_port in [port, port + 1, port + 2, 0]:  # 0 = let OS pick
+        try:
+            httpd = ReusableTCPServer(("", try_port), QuietHandler)
+            if try_port == 0:
+                try_port = httpd.server_address[1]
+            if try_port != port:
+                print(f"  ℹ Port {port} in use, using {try_port}")
+            break
+        except OSError:
+            if try_port == 0:
+                raise
+            continue
+    
+    try:
+        with httpd:
+            url = f"http://localhost:{try_port}/weather.html"
+            print(f"\n🌐 Preview: {url}")
+            print("   Press Ctrl+C to stop\n")
+            
+            # Open browser in background
+            threading.Timer(0.5, lambda: webbrowser.open(url)).start()
+            
+            httpd.serve_forever()
+    except KeyboardInterrupt:
+        print("\n✓ Server stopped")
+    finally:
+        os.chdir(original_dir)
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Weather Dashboard - Local Testing",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  python weather_local.py --mock              # Preview with VFR conditions
+  python weather_local.py --mock ifr          # Preview with IFR conditions  
+  python weather_local.py --mock stormy       # Preview with thunderstorm
+  python weather_local.py --live              # Use real API data
+  python weather_local.py --mock --screenshot # Also generate PNG
+
+Available scenarios: clear, ifr, mvfr, stormy
+        """
+    )
+    
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument("--mock", nargs="?", const="clear", metavar="SCENARIO",
+                      help="Use mock data (default: clear)")
+    mode.add_argument("--live", action="store_true",
+                      help="Use live API data (requires API key)")
+    
+    parser.add_argument("--screenshot", "-s", action="store_true",
+                        help="Generate PNG screenshot")
+    parser.add_argument("--no-browser", "-n", action="store_true",
+                        help="Don't open browser")
+    parser.add_argument("--debug", "-d", action="store_true",
+                        help="Show raw API data (JSON)")
+    parser.add_argument("--port", "-p", type=int, default=PORT,
+                        help=f"Server port (default: {PORT})")
+    parser.add_argument("--airport", "-a", default=DEFAULT_AIRPORT,
+                        help=f"Airport code for live data (default: {DEFAULT_AIRPORT})")
+    
+    args = parser.parse_args()
+    
+    print("=" * 60)
+    print("Weather Dashboard - Local Testing")
+    print("=" * 60)
+    
+    # Get weather data
+    if args.mock:
+        print(f"\n📊 Using mock data: {args.mock}")
+        data = get_mock_data(args.mock)
+    else:
+        print(f"\n📡 Fetching live data for {args.airport}...")
+        try:
+            data = fetch_live_weather(args.airport, debug=args.debug)
+        except Exception as e:
+            print(f"❌ Error: {e}")
+            return
+    
+    # Show summary
+    print(f"\n   Station: {data['arpt']} - {data['ArptName']}")
+    print(f"   Rules:   {data['rules']}")
+    print(f"   Weather: {data['obs']}")
+    print(f"   Wind:    {data['winddir']}° @ {data['wind']}kt", end="")
+    if data['gust']:
+        print(f" G{data['gust']}")
+    else:
+        print()
+    
+    # Render HTML
+    print("\n🎨 Rendering HTML...")
+    try:
+        render_html(data)
+        print(f"   ✓ Output: {HTML_OUT}")
+    except Exception as e:
+        print(f"❌ Error: {e}")
+        return
+    
+    # Take screenshot if requested
+    if args.screenshot:
+        print("\n📸 Taking screenshot...")
+        take_screenshot()
+    
+    # Open browser (skip if --no-browser or if only taking screenshot)
+    if not args.no_browser and not args.screenshot:
+        serve_and_open(args.port)
+
 
 if __name__ == "__main__":
     main()

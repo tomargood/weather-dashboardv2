@@ -10,23 +10,28 @@ html {
   background: white;
   color: black;
   line-height: 1.3;
-  width: 800px;
-  height: 480px;
+  width: 780px;
+  min-width: 780px;
+  max-width: 780px;
+  height: 500px;
+  min-height: 500px;
+  max-height: 500px;
   margin: 0;
   padding: 0;
-  position: relative;
+  overflow: hidden;
 }
 
 .container {
-  width: 100%;
-  height: 100%;
+  width: 780px;
+  min-width: 780px;
+  max-width: 780px;
+  height: 500px;
+  min-height: 500px;
+  max-height: 500px;
   display: flex;
   flex-direction: column;
   padding: 6px;
   box-sizing: border-box;
-  position: absolute;
-  top: 0;
-  left: 0;
 }
 
 /* Top Bar */
@@ -116,9 +121,67 @@ html {
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  background: linear-gradient(135deg, #f0f0f0 0%, #ffffff 100%);
+  /* Default background */
+  background-color: #ffffff;
   position: relative;
 }
+
+/* ===========================================
+   Weather Box Background Styles by Flight Rules
+   (Solid colors for e-ink compatibility)
+   =========================================== */
+
+/* VFR - Light blue sky */
+.weather-bg-vfr {
+  background-color: #87ceeb !important;
+}
+
+/* MVFR - Gray overcast */
+.weather-bg-mvfr {
+  background-color: #a0a0a0 !important;
+}
+
+/* IFR - Dark gray stormy */
+.weather-bg-ifr {
+  background-color: #505050 !important;
+}
+
+/* IFR - White text for dark background */
+.weather-bg-ifr .current-temp {
+  background: none !important;
+  -webkit-text-fill-color: white !important;
+  color: white !important;
+}
+
+.weather-bg-ifr .condition {
+  background: white !important;
+  color: black !important;
+}
+
+/* LIFR - Light gray fog */
+.weather-bg-lifr {
+  background-color: #707070 !important;
+}
+
+/* LIFR - White text for dark background */
+.weather-bg-lifr .current-temp {
+  background: none !important;
+  -webkit-text-fill-color: white !important;
+  color: white !important;
+}
+
+.weather-bg-lifr .condition {
+  background: white !important;
+  color: black !important;
+}
+
+/* Weather SVG icon */
+.weather-svg-icon {
+  width: 70px;
+  height: 70px;
+}
+
+/* =========================================== */
 
 .weather-icon-display {
   font-size: 40px;
@@ -245,10 +308,10 @@ html {
 }
 
 .taf-title {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: bold;
   text-align: center;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
   text-transform: uppercase;
   flex-shrink: 0;
 }
@@ -408,20 +471,24 @@ html {
 
 .taf-box {
   font-family: "Courier New", monospace;
-  line-height: 1.3;
-  white-space: pre-wrap;
-  word-break: break-word;
-  margin: 0;
-  padding: 0;
-  color: #2a2c2e;
-  font-size: 0.75rem;
-  flex: 1;
+  line-height: 1.4;
+  white-space: normal;
+  word-wrap: break-word;
   overflow: hidden;
+  margin: 0;
+  padding: 10px;
+  color: #000;
+  font-size: 12px;
+  font-weight: bold;
+  flex: 1;
 }
 
 .taf-text {
-  margin: 2px 0;
-  line-height: 1.2;
+  margin: 0 0 10px 0;
+  padding: 5;
+  line-height: 1.3;
+  white-space: normal;
+  word-wrap: break-word;
 }
 
 /* Footer */
