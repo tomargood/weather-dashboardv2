@@ -248,15 +248,17 @@ def clear_display():
 
 def input_listener():
     """Listen for airport code input in background"""
-    global NEW_AIRPORT
+    global NEW_AIRPORT, CURRENT_AIRPORT, LAST_DATA
     
     while True:
         try:
             user_input = input().strip().upper()
             if user_input:
                 if len(user_input) == 4:
-                    NEW_AIRPORT = user_input
-                    print(f"\n✈ New airport queued: {NEW_AIRPORT} (will update at next cycle)")
+                    CURRENT_AIRPORT = user_input
+                    LAST_DATA = None  # Force refresh for new airport
+                    print(f"\n✈ Switching to: {CURRENT_AIRPORT}")
+                    update()
                 elif user_input == 'Q' or user_input == 'QUIT':
                     raise KeyboardInterrupt
                 else:
@@ -297,14 +299,6 @@ if __name__ == "__main__":
             
             while True:
                 time.sleep(UPDATE_INTERVAL)
-                
-                # Check if new airport was entered
-                if NEW_AIRPORT:
-                    CURRENT_AIRPORT = NEW_AIRPORT
-                    NEW_AIRPORT = None
-                    LAST_DATA = None  # Force refresh for new airport
-                    print(f"\n✈ Switching to: {CURRENT_AIRPORT}")
-                
                 update()
                 
     except KeyboardInterrupt:
