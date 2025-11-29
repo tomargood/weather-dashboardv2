@@ -11,7 +11,6 @@ from datetime import datetime
 import time
 import subprocess
 from PIL import Image
-import sys
 import json
 
 # Configuration file
@@ -277,86 +276,34 @@ if __name__ == "__main__":
     config = load_config()
     current_airport = config["airport"]
     
-    # Check for command line argument (overrides config)
-    if len(sys.argv) > 1:
-        arg = sys.argv[1].strip().upper()
-        if arg == "--daemon":
-            # Daemon mode: run continuously with config file watching
-            print(f"🚀 Starting in daemon mode")
-            print(f"✈ Initial airport: {current_airport}")
-            print(f"📝 Edit config.json to change settings")
-            print(f"   Airport will update automatically!")
-            print("-" * 60)
-            
-            # Initialize config mtime
-            LAST_CONFIG_MTIME = CONFIG_FILE.stat().st_mtime
-            
-            # Run initial update
-            update(current_airport, force_refresh=True)
-            
-            try:
-                while True:
-                    # Reload config
-                    config = load_config()
-                    
-                    # Check if airport changed
-                    if config["airport"] != current_airport:
-                        print(f"\n✈ Airport changed: {current_airport} → {config['airport']}")
-                        current_airport = config["airport"]
-                        LAST_DATA = None  # Force refresh
-                        update(current_airport, force_refresh=True)
-                    else:
-                        # Normal update cycle
-                        time.sleep(config.get("update_interval", 300))
-                        if config.get("auto_update", True):
-                            update(current_airport)
-                        
-            except KeyboardInterrupt:
-                print("\n\n🛑 Stopping daemon...")
-                clear_display()
-        
-        elif len(arg) == 4:
-            current_airport = arg
-            print(f"✈ Using airport from command line: {current_airport}")
-            update(current_airport, force_refresh=True)
+    print(f"🚀 Starting weather dashboard")
+    print(f"✈ Airport: {current_airport}")
+    print(f"📝 Edit config.json to change settings")
+    print("-" * 60)
     
-    else:
-        # Interactive mode
-        airport_input = input(f"Enter airport code [{current_airport}]: ").strip().upper()
-        if airport_input and len(airport_input) == 4:
-            current_airport = airport_input
-        
-        print(f"✈ Using airport: {current_airport}")
-        
-        try:
-            # Run once
-            update(current_airport, force_refresh=True)
+    # Initialize config mtime
+    LAST_CONFIG_MTIME = CONFIG_FILE.stat().st_mtime
+    
+    # Run initial update
+    update(current_airport, force_refresh=True)
+    
+    try:
+        while True:
+            # Reload config
+            config = load_config()
             
-            # Ask about continuous updates
-            response = input("\nRun continuous updates? (y/n): ")
-            if response.lower() == 'y':
-                print(f"\n📝 To change airport, edit config.json")
-                print("Press Ctrl+C to stop")
-                print("-" * 40)
-                
-                # Initialize config mtime
-                LAST_CONFIG_MTIME = CONFIG_FILE.stat().st_mtime
-                
-                while True:
-                    time.sleep(config.get("update_interval", 300))
+            # Check if airport changed
+            if config["airport"] != current_airport:
+                print(f"\n✈ Airport changed: {current_airport} → {config['airport']}")
+                current_airport = config["airport"]
+                LAST_DATA = None  # Force refresh
+                update(current_airport, force_refresh=True)
+            else:
+                # Normal update cycle
+                time.sleep(config.get("update_interval", 300))
+                if config.get("auto_update", True):
+                    update(current_airport)
                     
-                    # Check if config changed
-                    if config_changed():
-                        config = load_config()
-                        if config["airport"] != current_airport:
-                            print(f"\n✈ Airport changed: {current_airport} → {config['airport']}")
-                            current_airport = config["airport"]
-                            LAST_DATA = None  # Force refresh
-                    
-                    if config.get("auto_update", True):
-                        update(current_airport)
-                    
-        except KeyboardInterrupt:
-            print("\n\n🛑 Stopping...")
-        finally:
-            clear_display()
+    except KeyboardInterrupt:
+        print("\n\n🛑 Stopping...")
+        clear_display()
