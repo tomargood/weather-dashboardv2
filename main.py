@@ -12,22 +12,22 @@ import time
 import subprocess
 from PIL import Image
 import sys
-import threading
-import select
+import json
 
-# Configuration
+# Configuration file
+CONFIG_FILE = Path("config.json")
+
+# API Key
 API_KEY = Path("API_keys/avwxkeys.txt").read_text().strip()
-CURRENT_AIRPORT = "KSKA"  # Default airport
+
+# Paths
 TEMPLATE = Path("templates/page.html")
 HTML_OUT = Path("output/weather.html")
 PNG_OUT = Path("output/weather.png")
-UPDATE_INTERVAL = 300  # 5 minutes
 
 # Cache for last displayed data
 LAST_DATA = None
-
-# Flag for new airport entered
-NEW_AIRPORT = None
+LAST_CONFIG_MTIME = 0
 
 # Try to import e-paper display
 try:
@@ -37,26 +37,54 @@ except:
     HAS_DISPLAY = False
     print("⚠ No e-paper display available")
 
-def fetch_weather():
+def load_config():
+    """Load configuration from JSON file"""
+    if not CONFIG_FILE.exists():
+        # Create default config
+        default_config = {
+            "airport": "KSKA",
+            "update_interval": 300,
+            "auto_update": True
+        }
+        CONFIG_FILE.write_text(json.dumps(default_config, indent=2))
+        return default_config
+    
+    with open(CONFIG_FILE, 'r') as f:
+        return json.load(f)
+
+def config_changed():
+    """Check if config file has been modified"""
+    global LAST_CONFIG_MTIME
+    
+    if not CONFIG_FILE.exists():
+        return False
+    
+    current_mtime = CONFIG_FILE.stat().st_mtime
+    if current_mtime != LAST_CONFIG_MTIME:
+        LAST_CONFIG_MTIME = current_mtime
+        return True
+    
+    return False
+
+def fetch_weather(airport):
     """Get weather data from AVWX API"""
-    global CURRENT_AIRPORT
     headers = {"Authorization": f"Bearer {API_KEY}"}
     
     # Get METAR
-    metar = requests.get(f"https://avwx.rest/api/metar/{CURRENT_AIRPORT}?remove=true", 
+    metar = requests.get(f"https://avwx.rest/api/metar/{airport}?remove=true", 
                          headers=headers, timeout=10).json()
     
     # Get Station
     try:
-        station = requests.get(f"https://avwx.rest/api/station/{CURRENT_AIRPORT}", 
+        station = requests.get(f"https://avwx.rest/api/station/{airport}", 
                               headers=headers, timeout=10).json()
         arpt_name = station["name"]
     except:
-        arpt_name = CURRENT_AIRPORT
+        arpt_name = airport
     
     # Get TAF
     try:
-        taf = requests.get(f"https://avwx.rest/api/taf/{CURRENT_AIRPORT}", 
+        taf = requests.get(f"https://avwx.rest/api/taf/{airport}", 
                           headers=headers, timeout=10).json()
         tafraw = [line["sanitized"] for line in taf["forecast"]]
     except:
@@ -144,7 +172,7 @@ def screenshot():
             print(f"  Screenshot: {img.size[0]}x{img.size[1]}")
             
             # Resize to exact 800x480 if needed
-            if img.size != (800, 480 ):
+            if img.size != (800, 480):
                 img = img.resize((800, 480), Image.Resampling.LANCZOS)
                 img.save(PNG_OUT)
                 print(f"  Resized to: 800x480")
@@ -194,18 +222,17 @@ def data_changed(new_data):
     
     return False
 
-
-def update(force_refresh=False):
+def update(airport, force_refresh=False):
     """Full update cycle"""
     global LAST_DATA
     
     print(f"\n{'='*60}")
-    print(f"Update: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - {CURRENT_AIRPORT}")
+    print(f"Update: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - {airport}")
     print(f"{'='*60}")
     
     try:
         print("Fetching weather...")
-        data = fetch_weather()
+        data = fetch_weather(airport)
         
         # Check if data has changed
         if not force_refresh and not data_changed(data):
@@ -245,63 +272,91 @@ def clear_display():
     except Exception as e:
         print(f"❌ Error clearing display: {e}")
 
-
-def input_listener():
-    """Listen for airport code input in background"""
-    global NEW_AIRPORT, CURRENT_AIRPORT, LAST_DATA
-    
-    while True:
-        try:
-            user_input = input().strip().upper()
-            if user_input:
-                if len(user_input) == 4:
-                    CURRENT_AIRPORT = user_input
-                    LAST_DATA = None  # Force refresh for new airport
-                    print(f"\n✈ Switching to: {CURRENT_AIRPORT}")
-                    update()
-                elif user_input == 'Q' or user_input == 'QUIT':
-                    raise KeyboardInterrupt
-                else:
-                    print(f"⚠ Invalid airport code: {user_input} (should be 4 characters like KGEG)")
-        except EOFError:
-            break
-
-
 if __name__ == "__main__":
-    # Check for command line argument first
+    # Load initial config
+    config = load_config()
+    current_airport = config["airport"]
+    
+    # Check for command line argument (overrides config)
     if len(sys.argv) > 1:
         arg = sys.argv[1].strip().upper()
-        if len(arg) == 4:
-            CURRENT_AIRPORT = arg
-    else:
-        # Ask for airport
-        airport_input = input(f"Enter airport code [{CURRENT_AIRPORT}]: ").strip().upper()
-        if airport_input and len(airport_input) == 4:
-            CURRENT_AIRPORT = airport_input
-    
-    print(f"✈ Using airport: {CURRENT_AIRPORT}")
-    
-    try:
-        # Run once
-        update()
+        if arg == "--daemon":
+            # Daemon mode: run continuously with config file watching
+            print(f"🚀 Starting in daemon mode")
+            print(f"✈ Initial airport: {current_airport}")
+            print(f"📝 Edit config.json to change settings")
+            print(f"   Airport will update automatically!")
+            print("-" * 60)
+            
+            # Initialize config mtime
+            LAST_CONFIG_MTIME = CONFIG_FILE.stat().st_mtime
+            
+            # Run initial update
+            update(current_airport, force_refresh=True)
+            
+            try:
+                while True:
+                    # Reload config
+                    config = load_config()
+                    
+                    # Check if airport changed
+                    if config["airport"] != current_airport:
+                        print(f"\n✈ Airport changed: {current_airport} → {config['airport']}")
+                        current_airport = config["airport"]
+                        LAST_DATA = None  # Force refresh
+                        update(current_airport, force_refresh=True)
+                    else:
+                        # Normal update cycle
+                        time.sleep(config.get("update_interval", 300))
+                        if config.get("auto_update", True):
+                            update(current_airport)
+                        
+            except KeyboardInterrupt:
+                print("\n\n🛑 Stopping daemon...")
+                clear_display()
         
-        # Ask about continuous updates
-        response = input("\nRun continuous updates every 5 minutes? (y/n): ")
-        if response.lower() == 'y':
-            print(f"\nRunning continuous updates for {CURRENT_AIRPORT}")
-            print("Type a new airport code (e.g., KGEG) to change")
-            print("Press Ctrl+C to stop")
-            print("-" * 40)
+        elif len(arg) == 4:
+            current_airport = arg
+            print(f"✈ Using airport from command line: {current_airport}")
+            update(current_airport, force_refresh=True)
+    
+    else:
+        # Interactive mode
+        airport_input = input(f"Enter airport code [{current_airport}]: ").strip().upper()
+        if airport_input and len(airport_input) == 4:
+            current_airport = airport_input
+        
+        print(f"✈ Using airport: {current_airport}")
+        
+        try:
+            # Run once
+            update(current_airport, force_refresh=True)
             
-            # Start input listener in background
-            listener = threading.Thread(target=input_listener, daemon=True)
-            listener.start()
-            
-            while True:
-                time.sleep(UPDATE_INTERVAL)
-                update()
+            # Ask about continuous updates
+            response = input("\nRun continuous updates? (y/n): ")
+            if response.lower() == 'y':
+                print(f"\n📝 To change airport, edit config.json")
+                print("Press Ctrl+C to stop")
+                print("-" * 40)
                 
-    except KeyboardInterrupt:
-        print("\n\n🛑 Stopping...")
-    finally:
-        clear_display()
+                # Initialize config mtime
+                LAST_CONFIG_MTIME = CONFIG_FILE.stat().st_mtime
+                
+                while True:
+                    time.sleep(config.get("update_interval", 300))
+                    
+                    # Check if config changed
+                    if config_changed():
+                        config = load_config()
+                        if config["airport"] != current_airport:
+                            print(f"\n✈ Airport changed: {current_airport} → {config['airport']}")
+                            current_airport = config["airport"]
+                            LAST_DATA = None  # Force refresh
+                    
+                    if config.get("auto_update", True):
+                        update(current_airport)
+                    
+        except KeyboardInterrupt:
+            print("\n\n🛑 Stopping...")
+        finally:
+            clear_display()
