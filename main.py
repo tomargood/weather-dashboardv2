@@ -287,6 +287,10 @@ if __name__ == "__main__":
     # Run initial update
     update(current_airport, force_refresh=True)
     
+    # Track time for weather updates
+    last_update_time = time.time()
+    config_check_interval = 20  # Check config every 20 seconds
+    
     try:
         while True:
             # Reload config
@@ -298,11 +302,20 @@ if __name__ == "__main__":
                 current_airport = config["airport"]
                 LAST_DATA = None  # Force refresh
                 update(current_airport, force_refresh=True)
+                last_update_time = time.time()  # Reset timer
             else:
-                # Normal update cycle
-                time.sleep(config.get("update_interval", 300))
-                if config.get("auto_update", True):
-                    update(current_airport)
+                # Check if it's time for a weather update
+                current_time = time.time()
+                time_since_update = current_time - last_update_time
+                update_interval = config.get("update_interval", 300)
+                
+                if time_since_update >= update_interval:
+                    if config.get("auto_update", True):
+                        update(current_airport)
+                        last_update_time = time.time()
+            
+            # Sleep for 20 seconds before checking config again
+            time.sleep(config_check_interval)
                     
     except KeyboardInterrupt:
         print("\n\n🛑 Stopping...")
